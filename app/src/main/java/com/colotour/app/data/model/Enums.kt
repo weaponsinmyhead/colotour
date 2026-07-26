@@ -32,7 +32,8 @@ enum class TourismInterest(val descripcion: String) {
     HISTORIA("Historia"),
     COMPRAS("Compras"),
     FOTOGRAFIA("Fotografía"),
-    EVENTOS("Eventos")
+    EVENTOS("Eventos"),
+    AVENTURA("Aventura / Trekking")
 }
 
 @Serializable

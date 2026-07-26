@@ -5,7 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -21,6 +21,8 @@ import org.osmdroid.views.overlay.Polyline
 @Composable
 fun ItineraryMapView(
     stops: List<ItineraryStop>,
+    selectedStopOrder: Int?,
+    onMarkerClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -63,11 +65,13 @@ fun ItineraryMapView(
             map.overlays.clear()
 
             val geoPoints = mutableListOf<GeoPoint>()
+            var targetMarker: Marker? = null
+            var targetPoint: GeoPoint? = null
 
             stops.forEach { stop ->
                 val lat = stop.latitud
                 val lon = stop.longitud
-                if ((lat != null) && (lon != null)) {
+                if (lat != null && lon != null) {
                     val point = GeoPoint(lat, lon)
                     geoPoints.add(point)
 
@@ -81,8 +85,21 @@ fun ItineraryMapView(
                         title = "[$markerIcon] ${stop.order}. ${stop.titulo}"
                         subDescription = "${stop.horaInicio} - ${stop.descripcion}"
                         snippet = stop.reason
+                        
+                        // Reportar click al componente padre
+                        setOnMarkerClickListener { _, _ ->
+                            onMarkerClick(stop.order)
+                            showInfoWindow()
+                            true
+                        }
                     }
                     map.overlays.add(marker)
+
+                    // Si es la parada seleccionada actualmente, la guardamos para enfocarla
+                    if (stop.order == selectedStopOrder) {
+                        targetMarker = marker
+                        targetPoint = point
+                    }
                 }
             }
 
@@ -97,7 +114,12 @@ fun ItineraryMapView(
             }
 
             // Centrado y zoom óptimo
-            if (geoPoints.isNotEmpty()) {
+            if (targetPoint != null && targetMarker != null) {
+                // Si hay un marcador seleccionado, animamos el mapa hacia él
+                map.controller.animateTo(targetPoint)
+                map.controller.setZoom(15.5)
+                targetMarker?.showInfoWindow()
+            } else if (geoPoints.isNotEmpty()) {
                 val lats = geoPoints.map { it.latitude }
                 val lons = geoPoints.map { it.longitude }
                 val minLat = lats.minOrNull() ?: 0.0

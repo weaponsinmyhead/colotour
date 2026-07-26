@@ -1,9 +1,12 @@
 package com.colotour.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,13 +19,20 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.colotour.app.data.model.ActivityVisualType
 import com.colotour.app.data.model.Itinerary
 import com.colotour.app.data.model.StopType
 import com.colotour.app.ui.viewmodel.ItineraryUiState
@@ -32,7 +42,7 @@ import com.colotour.app.ui.viewmodel.ItineraryUiState
 fun ItineraryScreen(
     uiState: ItineraryUiState,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Scaffold(
         topBar = {
@@ -42,7 +52,7 @@ fun ItineraryScreen(
                     IconButton(onClick = onBack) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                },
+                }
             )
         },
         modifier = modifier
@@ -109,7 +119,22 @@ fun ItineraryScreen(
 
 @Composable
 fun ItineraryDetails(itinerary: Itinerary) {
+    // Estado elevado de la parada seleccionada
+    var selectedStopOrder by remember { mutableStateOf<Int?>(null) }
+    val listState = rememberLazyListState()
+
+    // Auto-scroll al seleccionar una parada (desde mapa o click en lista)
+    LaunchedEffect(selectedStopOrder) {
+        selectedStopOrder?.let { order ->
+            val index = itinerary.actividades.indexOfFirst { it.order == order }
+            if (index != -1) {
+                listState.animateScrollToItem(index + 3) // Offset por header, mapa y titulo
+            }
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -232,10 +257,12 @@ fun ItineraryDetails(itinerary: Itinerary) {
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                val hasCoordinates = itinerary.actividades.any { (it.latitud != null) && (it.longitud != null) }
+                val hasCoordinates = itinerary.actividades.any { it.latitud != null && it.longitud != null }
                 if (hasCoordinates) {
                     ItineraryMapView(
                         stops = itinerary.actividades,
+                        selectedStopOrder = selectedStopOrder,
+                        onMarkerClick = { order -> selectedStopOrder = order },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -279,6 +306,8 @@ fun ItineraryDetails(itinerary: Itinerary) {
         }
 
         itemsIndexed(itinerary.actividades) { index, activity ->
+            val isSelected = activity.order == selectedStopOrder
+            
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -298,22 +327,30 @@ fun ItineraryDetails(itinerary: Itinerary) {
                         modifier = Modifier
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(bulletColor)
+                            .background(if (isSelected) MaterialTheme.colorScheme.error else bulletColor)
                     )
-                    if (index < (itinerary.actividades.size - 1)) {
+                    if (index < itinerary.actividades.size - 1) {
                         Box(
                             modifier = Modifier
                                 .width(2.dp)
-                                .height(130.dp)
+                                .height(140.dp)
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                         )
                     }
                 }
 
-                // Detalle de la actividad en una Card
+                // Detalle de la actividad en una Card interactiva
                 Card(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedStopOrder = activity.order },
+                    shape = RoundedCornerShape(12.dp),
+                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                    colors = if (isSelected) {
+                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    } else {
+                        CardDefaults.cardColors()
+                    }
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(
@@ -355,9 +392,9 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = if (activity.type == StopType.FOOD) Icons.Default.Info else Icons.Default.Star,
-                                    contentDescription = "Razón",
-                                    modifier = Modifier.size(12.dp),
+                                    imageVector = getIconForVisualType(activity.visualType),
+                                    contentDescription = "Tipo de actividad",
+                                    modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -402,5 +439,23 @@ fun ItineraryDetails(itinerary: Itinerary) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun getIconForVisualType(visualType: ActivityVisualType): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (visualType) {
+        ActivityVisualType.START -> Icons.Default.Place
+        ActivityVisualType.FOOD -> Icons.Default.Info
+        ActivityVisualType.NATURE -> Icons.Default.Place
+        ActivityVisualType.ADVENTURE -> Icons.Default.LocationOn
+        ActivityVisualType.CULTURE -> Icons.Default.Star
+        ActivityVisualType.HISTORY -> Icons.Default.Star
+        ActivityVisualType.SHOPPING -> Icons.Default.Star
+        ActivityVisualType.PHOTO -> Icons.Default.Star
+        ActivityVisualType.EVENT -> Icons.Default.DateRange
+        ActivityVisualType.FAMILY -> Icons.Default.Person
+        ActivityVisualType.MAINSTREAM -> Icons.Default.Star
+        ActivityVisualType.DEFAULT -> Icons.Default.LocationOn
     }
 }

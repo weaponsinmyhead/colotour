@@ -275,6 +275,114 @@ class MockPlacesRepository : PlacesRepository {
                 duracionRecomendadaMinutos = 100,
                 costoBasePorPersona = 5.0,
                 popularidad = 0.8
+            ),
+            CandidatePlace(
+                id = "p23",
+                nombre = "Sendero de Trekking Panorámico",
+                descripcion = "Ruta de senderismo de dificultad media con vistas panorámicas increíbles.",
+                latitud = baseLat - 0.007,
+                longitud = baseLon - 0.008,
+                estilo = TourismInterest.AVENTURA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 120,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.9
+            ),
+            CandidatePlace(
+                id = "p24",
+                nombre = "Circuito de Caminata Urbana",
+                descripcion = "Paseo autoguiado peatonal a través de los rincones más icónicos de la ciudad.",
+                latitud = baseLat + 0.002,
+                longitud = baseLon + 0.004,
+                estilo = TourismInterest.AVENTURA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 90,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.8
+            ),
+            CandidatePlace(
+                id = "p25",
+                nombre = "Reserva Natural con Pasarelas",
+                descripcion = "Reserva ecológica protegida ideal para avistaje de aves y contacto con el verde.",
+                latitud = baseLat - 0.008,
+                longitud = baseLon - 0.005,
+                estilo = TourismInterest.NATURALEZA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 90,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.95
+            ),
+            CandidatePlace(
+                id = "p26",
+                nombre = "Mirador del Cerro",
+                descripcion = "Punto más alto de la región con vistas espectaculares y binoculares de libre acceso.",
+                latitud = baseLat - 0.009,
+                longitud = baseLon - 0.009,
+                estilo = TourismInterest.AVENTURA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 60,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.89
+            ),
+            CandidatePlace(
+                id = "p27",
+                nombre = "Costanera o Rambla para caminar",
+                descripcion = "Camino peatonal pavimentado a orillas del agua, ideal para relajarse y respirar aire fresco.",
+                latitud = baseLat - 0.001,
+                longitud = baseLon + 0.007,
+                estilo = TourismInterest.NATURALEZA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 60,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.85
+            ),
+            CandidatePlace(
+                id = "p28",
+                nombre = "Parque Público con Lago",
+                descripcion = "Extenso espacio verde municipal con senderos peatonales y alquiler de botes.",
+                latitud = baseLat + 0.003,
+                longitud = baseLon - 0.007,
+                estilo = TourismInterest.NATURALEZA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 80,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.91
+            ),
+            CandidatePlace(
+                id = "p29",
+                nombre = "Circuito de Bicicleta Recreativa",
+                descripcion = "Ciclopista segura y panorámica que conecta múltiples parques de la zona.",
+                latitud = baseLat + 0.004,
+                longitud = baseLon + 0.003,
+                estilo = TourismInterest.AVENTURA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 100,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.87
+            ),
+            CandidatePlace(
+                id = "p30",
+                nombre = "Playa o Balneario Público",
+                descripcion = "Zona de arena y agua apta para baño o picnic con servicios básicos gratuitos.",
+                latitud = baseLat - 0.006,
+                longitud = baseLon + 0.008,
+                estilo = TourismInterest.NATURALEZA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 120,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.92
+            ),
+            CandidatePlace(
+                id = "p31",
+                nombre = "Punto Fotográfico al Atardecer",
+                descripcion = "Pequeño mirador y plataforma ideal para fotografiar la puesta de sol.",
+                latitud = baseLat - 0.004,
+                longitud = baseLon + 0.007,
+                estilo = TourismInterest.FOTOGRAFIA,
+                presupuesto = BudgetLevel.GRATUITO,
+                duracionRecomendadaMinutos = 30,
+                costoBasePorPersona = 0.0,
+                popularidad = 0.93
             )
         )
     }

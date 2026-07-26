@@ -10,9 +10,26 @@ enum class StopType {
 }
 
 @Serializable
+enum class ActivityVisualType {
+    START,
+    CULTURE,
+    HISTORY,
+    FOOD,
+    NATURE,
+    ADVENTURE,
+    SHOPPING,
+    PHOTO,
+    EVENT,
+    FAMILY,
+    MAINSTREAM,
+    DEFAULT
+}
+
+@Serializable
 data class ItineraryStop(
     val order: Int,
     val type: StopType,
+    val visualType: ActivityVisualType,
     val horaInicio: String,
     val titulo: String,
     val descripcion: String,
