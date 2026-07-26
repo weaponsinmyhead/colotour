@@ -480,7 +480,41 @@ fun ItineraryDetails(itinerary: Itinerary, onBack: () -> Unit) {
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column {
+                        // Imagen de cabecera si es tipo PLACE con soporte de Coil y fallback
+                        if (activity.type == StopType.PLACE) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(130.dp)
+                            ) {
+                                if (!activity.imageUrl.isNullOrBlank()) {
+                                    coil.compose.AsyncImage(
+                                        model = activity.imageUrl,
+                                        contentDescription = activity.titulo,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                    )
+                                } else {
+                                    val (bgColor, iconColor) = getPlaceholderColors(activity.visualType)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(bgColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = getIconForVisualType(activity.visualType),
+                                            contentDescription = "Placeholder",
+                                            tint = iconColor,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -581,6 +615,7 @@ fun ItineraryDetails(itinerary: Itinerary, onBack: () -> Unit) {
             }
         }
     }
+    }
 }
 
 @Composable
@@ -598,5 +633,19 @@ private fun getIconForVisualType(visualType: ActivityVisualType): androidx.compo
         ActivityVisualType.FAMILY -> Icons.Default.Person
         ActivityVisualType.MAINSTREAM -> Icons.Default.Star
         ActivityVisualType.DEFAULT -> Icons.Default.LocationOn
+    }
+}
+
+@Composable
+private fun getPlaceholderColors(visualType: ActivityVisualType): Pair<Color, Color> {
+    return when (visualType) {
+        ActivityVisualType.NATURE, ActivityVisualType.ADVENTURE -> 
+            Color(0xFFE8F5E9) to Color(0xFF2E7D32) // Verde suave
+        ActivityVisualType.FOOD -> 
+            Color(0xFFFFF3E0) to Color(0xFFEF6C00) // Naranja cálido
+        ActivityVisualType.CULTURE, ActivityVisualType.HISTORY -> 
+            Color(0xFFE3F2FD) to Color(0xFF1565C0) // Azul suave
+        else -> 
+            Color(0xFFF5F5F5) to Color(0xFF757575) // Gris neutro
     }
 }

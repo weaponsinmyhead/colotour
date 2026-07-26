@@ -37,7 +37,8 @@ data class ItineraryStop(
     val costoEstimado: String,
     val latitud: Double? = null,
     val longitud: Double? = null,
-    val reason: String = ""
+    val reason: String = "",
+    val imageUrl: String? = null
 )
 
 @Serializable

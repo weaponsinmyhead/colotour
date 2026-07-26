@@ -13,5 +13,6 @@ data class CandidatePlace(
     val presupuesto: BudgetLevel,
     val duracionRecomendadaMinutos: Int,
     val costoBasePorPersona: Double,
-    val popularidad: Double
+    val popularidad: Double,
+    val imageUrl: String? = null
 )

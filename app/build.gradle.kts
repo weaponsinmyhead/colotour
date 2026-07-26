@@ -87,4 +87,7 @@ dependencies {
 
   // OkHttp Client
   implementation(libs.okhttp)
+
+  // Coil Image Loading
+  implementation(libs.coil.compose)
 }
