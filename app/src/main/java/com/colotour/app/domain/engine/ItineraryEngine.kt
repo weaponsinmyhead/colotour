@@ -3,6 +3,7 @@ package com.colotour.app.domain.engine
 import com.colotour.app.data.model.*
 import com.colotour.app.data.repository.GeocodingRepository
 import com.colotour.app.data.repository.PlacesRepository
+import com.colotour.app.data.repository.HybridPlacesRepository
 import java.util.Locale
 import kotlin.math.abs
 
@@ -175,6 +176,8 @@ class ItineraryEngine(
         val rangoHorarioText = String.format(Locale.getDefault(), "%02d:%02d a %02d:%02d", startHour, startMin, endHour, endMin)
         val duracionTotalString = "${(preferences.endMinutes - preferences.startMinutes) / 60} horas disponibles"
 
+        val sourceSummary = (placesRepository as? HybridPlacesRepository)?.lastSourceSummary ?: "Sugerencias simuladas"
+
         return Itinerary(
             destino = preferences.destino.trim(),
             actividades = finalStops,
@@ -184,7 +187,8 @@ class ItineraryEngine(
             rangoHorarioText = rangoHorarioText,
             incluyeComida = preferences.includeFoodStops,
             cantidadPersonas = preferences.cantidadPersonas,
-            isFallbackCoordinates = isFallback
+            isFallbackCoordinates = isFallback,
+            dataSourceSummary = sourceSummary
         )
     }
 

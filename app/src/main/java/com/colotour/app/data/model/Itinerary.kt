@@ -50,5 +50,6 @@ data class Itinerary(
     val rangoHorarioText: String,
     val incluyeComida: Boolean,
     val cantidadPersonas: Int,
-    val isFallbackCoordinates: Boolean = false
+    val isFallbackCoordinates: Boolean = false,
+    val dataSourceSummary: String = ""
 )

@@ -192,6 +192,15 @@ fun ItineraryDetails(itinerary: Itinerary, onBack: () -> Unit) {
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (itinerary.dataSourceSummary.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = itinerary.dataSourceSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Row(

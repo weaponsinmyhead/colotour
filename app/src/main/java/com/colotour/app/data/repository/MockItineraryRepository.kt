@@ -6,9 +6,12 @@ import com.colotour.app.domain.engine.ItineraryEngine
 import kotlinx.coroutines.delay
 
 class MockItineraryRepository : ItineraryRepository {
-    private val placesRepository = MockPlacesRepository()
+    private val mockPlacesRepository = MockPlacesRepository()
+    private val overpassPlacesRepository = OverpassPlacesRepository()
+    private val hybridPlacesRepository = HybridPlacesRepository(overpassPlacesRepository, mockPlacesRepository)
+    
     private val geocodingRepository = NominatimGeocodingRepository()
-    private val engine = ItineraryEngine(placesRepository, geocodingRepository)
+    private val engine = ItineraryEngine(hybridPlacesRepository, geocodingRepository)
 
     override suspend fun generarItinerario(preferences: TravelPreferences): Result<Itinerary> {
         delay(1500) // Simula la latencia de la llamada de red/API
