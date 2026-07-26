@@ -80,4 +80,7 @@ dependencies {
 
   // Navigation
   implementation(libs.androidx.navigation.compose)
+
+  // OpenStreetMap
+  implementation(libs.osmdroid.android)
 }

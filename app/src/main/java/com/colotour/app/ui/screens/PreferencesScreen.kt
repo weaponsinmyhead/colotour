@@ -24,7 +24,7 @@ fun PreferencesScreen(
     val movilidad = remember { mutableStateListOf(MobilityType.CAMINANDO) }
     var timeRange by remember { mutableStateOf(540f..1080f) } // 09:00 a 18:00 por defecto
     var includeFoodStops by remember { mutableStateOf(true) }
-    var cantidadPersonas by remember { mutableStateOf(1f) }
+    var cantidadPersonas by remember { mutableFloatStateOf(1f) }
     var presupuesto by remember { mutableStateOf(BudgetLevel.MEDIO) }
     var ritmo by remember { mutableStateOf(TravelPace.EQUILIBRADO) }
 
@@ -91,7 +91,7 @@ fun PreferencesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TourismInterest.values().forEach { interest ->
+                    TourismInterest.entries.forEach { interest ->
                         val isSelected = intereses.contains(interest)
                         FilterChip(
                             selected = isSelected,
@@ -131,7 +131,7 @@ fun PreferencesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MobilityType.values().forEach { mob ->
+                    MobilityType.entries.forEach { mob ->
                         val isSelected = movilidad.contains(mob)
                         FilterChip(
                             selected = isSelected,
@@ -173,7 +173,7 @@ fun PreferencesScreen(
                     value = timeRange,
                     onValueChange = { range ->
                         // Rango mínimo obligatorio de 2 horas (120 minutos)
-                        if (range.endInclusive - range.start >= 120f) {
+                        if ((range.endInclusive - range.start) >= 120f) {
                             timeRange = range
                         }
                     },
@@ -220,11 +220,11 @@ fun PreferencesScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    BudgetLevel.values().forEach { level ->
+                    BudgetLevel.entries.forEach { level ->
                         FilterChip(
                             selected = presupuesto == level,
                             onClick = { presupuesto = level },
@@ -262,11 +262,11 @@ fun PreferencesScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TravelPace.values().forEach { pace ->
+                    TravelPace.entries.forEach { pace ->
                         FilterChip(
                             selected = ritmo == pace,
                             onClick = { ritmo = pace },

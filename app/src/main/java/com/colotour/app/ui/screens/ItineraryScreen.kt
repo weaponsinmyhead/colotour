@@ -33,7 +33,7 @@ import com.colotour.app.ui.viewmodel.ItineraryUiState
 fun ItineraryScreen(
     uiState: ItineraryUiState,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Scaffold(
         topBar = {
@@ -224,51 +224,46 @@ fun ItineraryDetails(itinerary: Itinerary) {
             }
         }
 
-        // Placeholder para OpenStreetMap
+        // OpenStreetMap interactivo o estado vacío si no hay coordenadas
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .height(240.dp),
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFFE0F7FA),
-                                    Color(0xFFB2DFDB)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(16.dp)
+                val hasCoordinates = itinerary.actividades.any { it.latitud != null && it.longitud != null }
+                if (hasCoordinates) {
+                    ItineraryMapView(
+                        stops = itinerary.actividades,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "Mapa",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "[ Área reservada para OpenStreetMap ]",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Se mostrarán ${itinerary.actividades.size} paradas geolocalizadas.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.DarkGray,
-                            textAlign = TextAlign.Center
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Mapa no disponible",
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Mapa no disponible para este itinerario.",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -306,7 +301,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             .clip(CircleShape)
                             .background(bulletColor)
                     )
-                    if (index < itinerary.actividades.size - 1) {
+                    if (index < (itinerary.actividades.size - 1)) {
                         Box(
                             modifier = Modifier
                                 .width(2.dp)

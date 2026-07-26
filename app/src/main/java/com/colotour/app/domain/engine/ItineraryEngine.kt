@@ -6,7 +6,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 class ItineraryEngine(
-    private val placesRepository: PlacesRepository
+    private val placesRepository: PlacesRepository,
 ) {
     private val scorer = PlaceScorer()
     private val routeOptimizer = RouteOptimizer()
@@ -16,11 +16,11 @@ class ItineraryEngine(
     suspend fun generate(preferences: TravelPreferences): Itinerary {
         // 1. Resolver punto de partida y coordenadas mock del destino
         val hash = preferences.destino.lowercase().hashCode()
-        val baseLat = -34.6037 + (abs(hash) % 1000) * 0.0001
+        val baseLat = -34.6037 + ((abs(hash) % 1000) * 0.0001)
         val baseLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
 
         val startingPoint = preferences.startingPointName.trim()
-        val startPointName = if (startingPoint.isEmpty()) "Centro de la ciudad" else startingPoint
+        val startPointName = startingPoint.ifEmpty { "Centro de la ciudad" }
         val startPoint = StartPoint(name = startPointName, latitude = baseLat, longitude = baseLon)
 
         // 2. Obtener candidatos locales
@@ -31,12 +31,13 @@ class ItineraryEngine(
         val availableCandidates = candidates.toMutableList()
         val seenInterests = mutableSetOf<TourismInterest>()
 
-        for (step in 1..10) {
-            if (availableCandidates.isEmpty()) break
+        var count = 0
+        while (count < 10 && availableCandidates.isNotEmpty()) {
             val best = availableCandidates.maxByOrNull { scorer.scorePlace(it, preferences, seenInterests) } ?: break
             selectedCandidates.add(best)
             availableCandidates.remove(best)
             seenInterests.add(best.estilo)
+            count++
         }
 
         // 4. Resolver orden del recorrido desde el punto de partida (Nearest Neighbor)
