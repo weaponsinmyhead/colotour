@@ -6,11 +6,7 @@ import com.colotour.app.domain.engine.CandidatePlace
 import kotlin.math.abs
 
 class MockPlacesRepository : PlacesRepository {
-    override suspend fun getCandidatePlaces(destino: String): List<CandidatePlace> {
-        val hash = destino.lowercase().hashCode()
-        val baseLat = -34.6037 + (abs(hash) % 1000) * 0.0001
-        val baseLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
-
+    override suspend fun getCandidatePlaces(destino: String, baseLat: Double, baseLon: Double): List<CandidatePlace> {
         return listOf(
             CandidatePlace(
                 id = "p1",

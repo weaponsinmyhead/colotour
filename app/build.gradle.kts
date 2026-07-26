@@ -84,4 +84,7 @@ dependencies {
 
   // OpenStreetMap
   implementation(libs.osmdroid.android)
+
+  // OkHttp Client
+  implementation(libs.okhttp)
 }

@@ -49,5 +49,6 @@ data class Itinerary(
     val puntoPartida: String,
     val rangoHorarioText: String,
     val incluyeComida: Boolean,
-    val cantidadPersonas: Int
+    val cantidadPersonas: Int,
+    val isFallbackCoordinates: Boolean = false
 )

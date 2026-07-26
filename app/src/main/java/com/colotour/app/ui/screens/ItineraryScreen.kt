@@ -124,11 +124,12 @@ fun ItineraryDetails(itinerary: Itinerary) {
     val listState = rememberLazyListState()
 
     // Auto-scroll al seleccionar una parada (desde mapa o click en lista)
+    val scrollOffset = 3 + (if (itinerary.isFallbackCoordinates) 1 else 0)
     LaunchedEffect(selectedStopOrder) {
         selectedStopOrder?.let { order ->
             val index = itinerary.actividades.indexOfFirst { it.order == order }
             if (index != -1) {
-                listState.animateScrollToItem(index + 3) // Offset por header, mapa y titulo
+                listState.animateScrollToItem(index + scrollOffset)
             }
         }
     }
@@ -242,6 +243,33 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+
+        if (itinerary.isFallbackCoordinates) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Aviso de ubicación",
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Ubicación aproximada por falta de geocodificación precisa.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }

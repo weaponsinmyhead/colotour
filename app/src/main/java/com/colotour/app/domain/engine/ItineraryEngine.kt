@@ -1,12 +1,14 @@
 package com.colotour.app.domain.engine
 
 import com.colotour.app.data.model.*
+import com.colotour.app.data.repository.GeocodingRepository
 import com.colotour.app.data.repository.PlacesRepository
 import java.util.Locale
 import kotlin.math.abs
 
 class ItineraryEngine(
-    private val placesRepository: PlacesRepository
+    private val placesRepository: PlacesRepository,
+    private val geocodingRepository: GeocodingRepository
 ) {
     private val scorer = PlaceScorer()
     private val routeOptimizer = RouteOptimizer()
@@ -14,19 +16,44 @@ class ItineraryEngine(
     private val costEstimator = CostEstimator()
 
     suspend fun generate(preferences: TravelPreferences): Itinerary {
-        // 1. Resolver punto de partida y coordenadas mock del destino
-        val hash = preferences.destino.lowercase().hashCode()
-        val baseLat = -34.6037 + (abs(hash) % 1000) * 0.0001
-        val baseLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
+        // 1. Intentar geocodificar destino principal
+        var isFallback = false
+        var destLat = 0.0
+        var destLon = 0.0
 
+        val destResult = geocodingRepository.geocode(preferences.destino)
+        if (destResult.isSuccess) {
+            val point = destResult.getOrThrow()
+            destLat = point.latitude
+            destLon = point.longitude
+        } else {
+            // Fallback en base a hash local para mantener funcionamiento sin conexión
+            isFallback = true
+            val hash = preferences.destino.lowercase().hashCode()
+            destLat = -34.6037 + (abs(hash) % 1000) * 0.0001
+            destLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
+        }
+
+        // 2. Intentar geocodificar punto de partida si está definido
         val startingPoint = preferences.startingPointName.trim()
         val startPointName = if (startingPoint.isEmpty()) "Centro de la ciudad" else startingPoint
-        val startPoint = StartPoint(name = startPointName, latitude = baseLat, longitude = baseLon)
+        var startLat = destLat
+        var startLon = destLon
 
-        // 2. Obtener candidatos locales
-        val candidates = placesRepository.getCandidatePlaces(preferences.destino)
+        if (startingPoint.isNotEmpty()) {
+            val startResult = geocodingRepository.geocode("$startingPoint, ${preferences.destino}")
+            if (startResult.isSuccess) {
+                val point = startResult.getOrThrow()
+                startLat = point.latitude
+                startLon = point.longitude
+            }
+        }
+        val startPoint = StartPoint(name = startPointName, latitude = startLat, longitude = startLon)
 
-        // 3. Seleccionar los mejores candidatos incentivando la diversidad de intereses
+        // 3. Obtener candidatos locales alrededor del centro real geocodificado
+        val candidates = placesRepository.getCandidatePlaces(preferences.destino, destLat, destLon)
+
+        // 4. Seleccionar los mejores candidatos incentivando la diversidad de intereses
         val selectedCandidates = mutableListOf<CandidatePlace>()
         val availableCandidates = candidates.toMutableList()
         val seenInterests = mutableSetOf<TourismInterest>()
@@ -39,10 +66,10 @@ class ItineraryEngine(
             seenInterests.add(best.estilo)
         }
 
-        // 4. Resolver orden del recorrido desde el punto de partida (Nearest Neighbor)
+        // 5. Resolver orden del recorrido desde el punto de partida (Nearest Neighbor)
         val optimizedRoute = routeOptimizer.optimizeRoute(startPoint, selectedCandidates)
 
-        // 5. Planificar tiempos (sin solapamiento, con comidas integradas)
+        // 6. Planificar tiempos (sin solapamiento, con comidas integradas)
         val plannedStops = timePlanner.planTimes(
             places = optimizedRoute,
             startMinutes = preferences.startMinutes,
@@ -52,7 +79,7 @@ class ItineraryEngine(
             presupuesto = preferences.presupuesto
         )
 
-        // 6. Estimar costos finales
+        // 7. Estimar costos finales
         val costResult = costEstimator.estimateCosts(
             activities = plannedStops,
             cantidadPersonas = preferences.cantidadPersonas,
@@ -60,7 +87,7 @@ class ItineraryEngine(
             presupuesto = preferences.presupuesto
         )
 
-        // 7. Mapear a modelos públicos agregando orden, tipo y razones descriptivas
+        // 8. Mapear a modelos públicos agregando orden, tipo y razones descriptivas
         val finalStops = mutableListOf<ItineraryStop>()
         
         // Agregar parada inicial
@@ -156,7 +183,8 @@ class ItineraryEngine(
             puntoPartida = startPointName,
             rangoHorarioText = rangoHorarioText,
             incluyeComida = preferences.includeFoodStops,
-            cantidadPersonas = preferences.cantidadPersonas
+            cantidadPersonas = preferences.cantidadPersonas,
+            isFallbackCoordinates = isFallback
         )
     }
 

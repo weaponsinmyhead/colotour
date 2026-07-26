@@ -7,7 +7,8 @@ import kotlinx.coroutines.delay
 
 class MockItineraryRepository : ItineraryRepository {
     private val placesRepository = MockPlacesRepository()
-    private val engine = ItineraryEngine(placesRepository)
+    private val geocodingRepository = NominatimGeocodingRepository()
+    private val engine = ItineraryEngine(placesRepository, geocodingRepository)
 
     override suspend fun generarItinerario(preferences: TravelPreferences): Result<Itinerary> {
         delay(1500) // Simula la latencia de la llamada de red/API
