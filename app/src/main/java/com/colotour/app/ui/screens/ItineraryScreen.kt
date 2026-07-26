@@ -27,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,14 +46,18 @@ fun ItineraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tu Itinerario") },
+                title = { Text("Tu Itinerario Colotour") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { innerPadding ->
         Box(
@@ -74,12 +77,18 @@ fun ItineraryScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(16.dp))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(20.dp))
                         Text(
-                            text = "Diseñando tu día perfecto...",
+                            text = "Buscando el mejor recorrido...",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Ajustando horarios y paradas turísticas",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -87,12 +96,12 @@ fun ItineraryScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(16.dp),
+                            .padding(24.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Ocurrió un error",
+                            text = "Ups, algo salió mal",
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.Bold
@@ -101,10 +110,14 @@ fun ItineraryScreen(
                         Text(
                             text = uiState.message,
                             style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                         )
                         Spacer(modifier = Modifier.height(24.dp))
-                        Button(onClick = onBack) {
+                        Button(
+                            onClick = onBack,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                        ) {
                             Text("Volver a intentar")
                         }
                     }
@@ -119,11 +132,9 @@ fun ItineraryScreen(
 
 @Composable
 fun ItineraryDetails(itinerary: Itinerary) {
-    // Estado elevado de la parada seleccionada
     var selectedStopOrder by remember { mutableStateOf<Int?>(null) }
     val listState = rememberLazyListState()
 
-    // Auto-scroll al seleccionar una parada (desde mapa o click en lista)
     val scrollOffset = 3 + (if (itinerary.isFallbackCoordinates) 1 else 0)
     LaunchedEffect(selectedStopOrder) {
         selectedStopOrder?.let { order ->
@@ -140,22 +151,22 @@ fun ItineraryDetails(itinerary: Itinerary) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Cabecera del Itinerario
+        // Tarjeta Resumen Principal
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                shape = RoundedCornerShape(20.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(20.dp)) {
                     Text(
                         text = itinerary.destino,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Fila 1: Punto de partida y Horario
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -165,13 +176,13 @@ fun ItineraryDetails(itinerary: Itinerary) {
                                 imageVector = Icons.Default.Place,
                                 contentDescription = "Partida",
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Inicio: ${itinerary.puntoPartida}",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                fontWeight = FontWeight.Medium
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,19 +190,18 @@ fun ItineraryDetails(itinerary: Itinerary) {
                                 imageVector = Icons.Default.DateRange,
                                 contentDescription = "Horario",
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = itinerary.rangoHorarioText,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Fila 2: Personas y Comidas
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -201,13 +211,13 @@ fun ItineraryDetails(itinerary: Itinerary) {
                                 imageVector = Icons.Default.Person,
                                 contentDescription = "Personas",
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "${itinerary.cantidadPersonas} pers.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                fontWeight = FontWeight.Medium
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -215,32 +225,30 @@ fun ItineraryDetails(itinerary: Itinerary) {
                                 imageVector = Icons.Default.Info,
                                 contentDescription = "Comidas",
                                 modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (itinerary.incluyeComida) "Comidas incluidas" else "Sin comida programada",
+                                text = if (itinerary.incluyeComida) "Comidas incluidas" else "Sin comida",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Presupuesto total
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "Presupuesto Estimado: ",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = itinerary.costoTotalEstimado,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -249,11 +257,13 @@ fun ItineraryDetails(itinerary: Itinerary) {
             }
         }
 
+        // Banner discreto de Fallback
         if (itinerary.isFallbackCoordinates) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
@@ -276,14 +286,14 @@ fun ItineraryDetails(itinerary: Itinerary) {
             }
         }
 
-        // OpenStreetMap interactivo o estado vacío si no hay coordenadas
+        // Mapa OSM integrado como protagonista
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    .height(280.dp),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
                 val hasCoordinates = itinerary.actividades.any { it.latitud != null && it.longitud != null }
                 if (hasCoordinates) {
@@ -323,13 +333,14 @@ fun ItineraryDetails(itinerary: Itinerary) {
             }
         }
 
-        // Listado Cronológico de Actividades
+        // Listado Cronológico
         item {
             Text(
                 text = "Cronograma del Día",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 8.dp)
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
 
@@ -340,7 +351,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Indicador de Línea de Tiempo (Timeline bullet)
+                // Indicador de Línea de Tiempo
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.width(24.dp)
@@ -355,32 +366,35 @@ fun ItineraryDetails(itinerary: Itinerary) {
                         modifier = Modifier
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(if (isSelected) MaterialTheme.colorScheme.error else bulletColor)
+                            .background(if (isSelected) MaterialTheme.colorScheme.tertiary else bulletColor)
                     )
                     if (index < itinerary.actividades.size - 1) {
                         Box(
                             modifier = Modifier
                                 .width(2.dp)
                                 .height(140.dp)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                         )
                     }
                 }
 
-                // Detalle de la actividad en una Card interactiva
+                // Card interactiva de Parada
                 Card(
                     modifier = Modifier
                         .weight(1f)
                         .clickable { selectedStopOrder = activity.order },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                    colors = if (isSelected) {
-                        CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    } else {
-                        CardDefaults.cardColors()
-                    }
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -399,14 +413,17 @@ fun ItineraryDetails(itinerary: Itinerary) {
                                     StopType.PLACE -> MaterialTheme.colorScheme.primaryContainer
                                 }
                             ) {
-                                Text(activity.duracionEstimada)
+                                Text(
+                                    text = activity.duracionEstimada,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = activity.titulo,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -415,17 +432,26 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         
-                        // Renderizar Reason si está presente
+                        // Reason / Sugerencia
                         if (activity.reason.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Icon(
                                     imageVector = getIconForVisualType(activity.visualType),
                                     contentDescription = "Tipo de actividad",
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = activity.reason,
                                     style = MaterialTheme.typography.bodySmall,
@@ -435,7 +461,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
@@ -444,7 +470,8 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             Text(
                                 text = "Costo: ${activity.costoEstimado}",
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (activity.latitud != null && activity.longitud != null) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
