@@ -18,5 +18,9 @@ data class Itinerary(
     val destino: String,
     val actividades: List<ItineraryStop>,
     val duracionTotal: String,
-    val costoTotalEstimado: String
+    val costoTotalEstimado: String,
+    val puntoPartida: String,
+    val rangoHorarioText: String,
+    val incluyeComida: Boolean,
+    val cantidadPersonas: Int
 )

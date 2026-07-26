@@ -3,41 +3,40 @@ package com.colotour.app.data.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class Duracion(val descripcion: String) {
-    DURACION_2H("2 Horas"),
-    DURACION_4H("4 Horas"),
-    DURACION_6H("6 Horas"),
-    DIA_COMPLETO("Día Completo")
-}
-
-@Serializable
-enum class Movilidad(val descripcion: String) {
-    CAMINANDO("Caminando"),
-    TRANSPORTE_PUBLICO("Transporte Público"),
-    AUTO("Auto"),
-    BICICLETA("Bicicleta"),
-    MIXTO("Mixto")
-}
-
-@Serializable
-enum class Presupuesto(val descripcion: String) {
+enum class BudgetLevel(val descripcion: String) {
+    GRATUITO("Gratuito"),
     BAJO("Bajo ($)"),
     MEDIO("Medio ($$)"),
     ALTO("Alto ($$$)")
 }
 
 @Serializable
-enum class EstiloTuristico(val descripcion: String) {
+enum class MobilityType(val descripcion: String) {
+    CAMINANDO("Caminando"),
+    TRANSPORTE_PUBLICO("Transporte Público"),
+    AUTO("Auto"),
+    BICICLETA("Bicicleta"),
+    TAXI_APP("Taxi / App"),
+    MIXTO("Mixto")
+}
+
+@Serializable
+enum class TourismInterest(val descripcion: String) {
     CLASICO("Clásico"),
     ALTERNATIVO("Alternativo"),
     MAINSTREAM("Popular/Mainstream"),
     CULTURAL("Cultural"),
     GASTRONOMICO("Gastronómico"),
-    FAMILIAR("Familiar")
+    NATURALEZA("Naturaleza"),
+    FAMILIAR("Familiar"),
+    HISTORIA("Historia"),
+    COMPRAS("Compras"),
+    FOTOGRAFIA("Fotografía"),
+    EVENTOS("Eventos")
 }
 
 @Serializable
-enum class Ritmo(val descripcion: String) {
+enum class TravelPace(val descripcion: String) {
     TRANQUILO("Tranquilo"),
     EQUILIBRADO("Equilibrado"),
     INTENSO("Intenso")

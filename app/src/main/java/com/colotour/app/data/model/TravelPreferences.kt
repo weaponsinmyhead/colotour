@@ -5,10 +5,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TravelPreferences(
     val destino: String,
-    val duracion: Duracion,
-    val movilidad: Movilidad,
+    val intereses: Set<TourismInterest>,
+    val movilidad: Set<MobilityType>,
+    val startMinutes: Int,
+    val endMinutes: Int,
+    val startingPointName: String,
+    val includeFoodStops: Boolean,
     val cantidadPersonas: Int,
-    val presupuesto: Presupuesto,
-    val estiloTuristico: EstiloTuristico,
-    val ritmo: Ritmo
+    val presupuesto: BudgetLevel,
+    val ritmo: TravelPace
 )

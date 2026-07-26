@@ -3,8 +3,6 @@ package com.colotour.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.colotour.app.data.model.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,14 +19,18 @@ fun PreferencesScreen(
     modifier: Modifier = Modifier
 ) {
     var destino by remember { mutableStateOf("") }
-    var duracion by remember { mutableStateOf(Duracion.DIA_COMPLETO) }
-    var movilidad by remember { mutableStateOf(Movilidad.CAMINANDO) }
+    var startingPointName by remember { mutableStateOf("") }
+    val intereses = remember { mutableStateListOf(TourismInterest.CLASICO) }
+    val movilidad = remember { mutableStateListOf(MobilityType.CAMINANDO) }
+    var timeRange by remember { mutableStateOf(540f..1080f) } // 09:00 a 18:00 por defecto
+    var includeFoodStops by remember { mutableStateOf(true) }
     var cantidadPersonas by remember { mutableStateOf(1f) }
-    var presupuesto by remember { mutableStateOf(Presupuesto.MEDIO) }
-    var estiloTuristico by remember { mutableStateOf(EstiloTuristico.CULTURAL) }
-    var ritmo by remember { mutableStateOf(Ritmo.EQUILIBRADO) }
+    var presupuesto by remember { mutableStateOf(BudgetLevel.MEDIO) }
+    var ritmo by remember { mutableStateOf(TravelPace.EQUILIBRADO) }
 
-    var showError by remember { mutableStateOf(false) }
+    var showDestinoError by remember { mutableStateOf(false) }
+    var showInteresError by remember { mutableStateOf(false) }
+    var showMovilidadError by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -37,26 +40,26 @@ fun PreferencesScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
-            text = "Preferencias de tu Viaje",
+            text = "Planifica tu Día de Viaje",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
 
-        // Destino
+        // 1. Destino
         OutlinedTextField(
             value = destino,
             onValueChange = {
                 destino = it
-                if (showError && it.isNotBlank()) showError = false
+                if (showDestinoError && it.isNotBlank()) showDestinoError = false
             },
             label = { Text("¿A dónde viajas?") },
             placeholder = { Text("Ej. Buenos Aires, Bariloche...") },
-            isError = showError,
+            isError = showDestinoError,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
-        if (showError) {
+        if (showDestinoError) {
             Text(
                 text = "El destino no puede estar vacío",
                 color = MaterialTheme.colorScheme.error,
@@ -65,11 +68,21 @@ fun PreferencesScreen(
             )
         }
 
-        // Duración
+        // 2. Punto de Partida
+        OutlinedTextField(
+            value = startingPointName,
+            onValueChange = { startingPointName = it },
+            label = { Text("Punto de partida (Opcional)") },
+            placeholder = { Text("Ej. Hotel, dirección, estación o zona") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        // 3. Intereses Múltiples
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "Duración del itinerario",
+                    text = "Intereses Turísticos (Elige al menos uno)",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -78,22 +91,38 @@ fun PreferencesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Duracion.entries.forEach { item ->
+                    TourismInterest.values().forEach { interest ->
+                        val isSelected = intereses.contains(interest)
                         FilterChip(
-                            selected = duracion == item,
-                            onClick = { duracion = item },
-                            label = { Text(item.descripcion) }
+                            selected = isSelected,
+                            onClick = {
+                                if (isSelected) {
+                                    intereses.remove(interest)
+                                } else {
+                                    intereses.add(interest)
+                                }
+                                if (intereses.isNotEmpty()) showInteresError = false
+                            },
+                            label = { Text(interest.descripcion) }
                         )
                     }
+                }
+                if (showInteresError) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Debes seleccionar al menos un interés",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
 
-        // Movilidad
+        // 4. Movilidad Múltiple
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "Cómo te vas a mover",
+                    text = "Movilidad preferida (Elige al menos una)",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -102,18 +131,111 @@ fun PreferencesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Movilidad.entries.forEach { item ->
+                    MobilityType.values().forEach { mob ->
+                        val isSelected = movilidad.contains(mob)
                         FilterChip(
-                            selected = movilidad == item,
-                            onClick = { movilidad = item },
-                            label = { Text(item.descripcion) }
+                            selected = isSelected,
+                            onClick = {
+                                if (isSelected) {
+                                    movilidad.remove(mob)
+                                } else {
+                                    movilidad.add(mob)
+                                }
+                                if (movilidad.isNotEmpty()) showMovilidadError = false
+                            },
+                            label = { Text(mob.descripcion) }
+                        )
+                    }
+                }
+                if (showMovilidadError) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Debes seleccionar al menos una movilidad",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        // 5. Horario Rango Slider (08:00 a 23:00 = 480 min a 1380 min)
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                val startFormatted = formatMinutes(timeRange.start.toInt())
+                val endFormatted = formatMinutes(timeRange.endInclusive.toInt())
+                Text(
+                    text = "Horario disponible: $startFormatted a $endFormatted",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                RangeSlider(
+                    value = timeRange,
+                    onValueChange = { range ->
+                        // Rango mínimo obligatorio de 2 horas (120 minutos)
+                        if (range.endInclusive - range.start >= 120f) {
+                            timeRange = range
+                        }
+                    },
+                    valueRange = 480f..1380f,
+                    steps = 29
+                )
+            }
+        }
+
+        // 6. Switch paradas para comer
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Incluir paradas para comer",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Agrega desayuno, almuerzo o cena según tu horario.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = includeFoodStops,
+                    onCheckedChange = { includeFoodStops = it }
+                )
+            }
+        }
+
+        // 7. Presupuesto
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Nivel de Presupuesto",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BudgetLevel.values().forEach { level ->
+                        FilterChip(
+                            selected = presupuesto == level,
+                            onClick = { presupuesto = level },
+                            label = { Text(level.descripcion) }
                         )
                     }
                 }
             }
         }
 
-        // Cantidad de personas
+        // 8. Cantidad de personas
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
@@ -131,81 +253,24 @@ fun PreferencesScreen(
             }
         }
 
-        // Presupuesto
+        // 9. Ritmo
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = "Presupuesto",
+                    text = "Ritmo sugerido",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Presupuesto.entries.forEach { item ->
+                    TravelPace.values().forEach { pace ->
                         FilterChip(
-                            selected = presupuesto == item,
-                            onClick = { presupuesto = item },
-                            label = { Text(item.descripcion) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // Estilo Turístico (Dropdown)
-        var estiloDropdownExpanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = estiloDropdownExpanded,
-            onExpandedChange = { estiloDropdownExpanded = !estiloDropdownExpanded }
-        ) {
-            OutlinedTextField(
-                readOnly = true,
-                value = estiloTuristico.descripcion,
-                onValueChange = {},
-                label = { Text("Estilo Turístico") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = estiloDropdownExpanded) },
-                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-            )
-            ExposedDropdownMenu(
-                expanded = estiloDropdownExpanded,
-                onDismissRequest = { estiloDropdownExpanded = false }
-            ) {
-                EstiloTuristico.entries.forEach { estilo ->
-                    DropdownMenuItem(
-                        text = { Text(estilo.descripcion) },
-                        onClick = {
-                            estiloTuristico = estilo
-                            estiloDropdownExpanded = false
-                        }
-                    )
-                }
-            }
-        }
-
-        // Ritmo
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Ritmo del viaje",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Ritmo.entries.forEach { item ->
-                        FilterChip(
-                            selected = ritmo == item,
-                            onClick = { ritmo = item },
-                            label = { Text(item.descripcion) }
+                            selected = ritmo == pace,
+                            onClick = { ritmo = pace },
+                            label = { Text(pace.descripcion) }
                         )
                     }
                 }
@@ -216,17 +281,26 @@ fun PreferencesScreen(
 
         Button(
             onClick = {
-                if (destino.isBlank()) {
-                    showError = true
-                } else {
+                val hasDestino = destino.isNotBlank()
+                val hasIntereses = intereses.isNotEmpty()
+                val hasMovilidad = movilidad.isNotEmpty()
+
+                showDestinoError = !hasDestino
+                showInteresError = !hasIntereses
+                showMovilidadError = !hasMovilidad
+
+                if (hasDestino && hasIntereses && hasMovilidad) {
                     onGenerate(
                         TravelPreferences(
                             destino = destino,
-                            duracion = duracion,
-                            movilidad = movilidad,
+                            intereses = intereses.toSet(),
+                            movilidad = movilidad.toSet(),
+                            startMinutes = timeRange.start.toInt(),
+                            endMinutes = timeRange.endInclusive.toInt(),
+                            startingPointName = startingPointName,
+                            includeFoodStops = includeFoodStops,
                             cantidadPersonas = cantidadPersonas.toInt(),
                             presupuesto = presupuesto,
-                            estiloTuristico = estiloTuristico,
                             ritmo = ritmo
                         )
                     )
@@ -243,4 +317,10 @@ fun PreferencesScreen(
             )
         }
     }
+}
+
+private fun formatMinutes(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return String.format(Locale.getDefault(), "%02d:%02d", h, m)
 }
