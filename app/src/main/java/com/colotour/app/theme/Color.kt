@@ -1,4 +1,4 @@
-package com.example.travelitinerary.theme
+package com.colotour.app.theme
 
 import androidx.compose.ui.graphics.Color
 

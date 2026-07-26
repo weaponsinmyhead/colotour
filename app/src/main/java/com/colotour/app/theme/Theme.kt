@@ -1,4 +1,4 @@
-package com.example.travelitinerary.theme
+package com.colotour.app.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

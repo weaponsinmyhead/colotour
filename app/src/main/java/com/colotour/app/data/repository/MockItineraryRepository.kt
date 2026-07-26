@@ -1,6 +1,6 @@
-package com.example.travelitinerary.data.repository
+package com.colotour.app.data.repository
 
-import com.example.travelitinerary.data.model.*
+import com.colotour.app.data.model.*
 import kotlinx.coroutines.delay
 
 class MockItineraryRepository : ItineraryRepository {
@@ -13,7 +13,7 @@ class MockItineraryRepository : ItineraryRepository {
         }
 
         val destinoNormalized = preferences.destino.trim()
-        val actividades = mutableListOf<ItineraryActivity>()
+        val actividades = mutableListOf<ItineraryStop>()
 
         // Cantidad de actividades según duración
         val numActividades = when (preferences.duracion) {
@@ -90,7 +90,7 @@ class MockItineraryRepository : ItineraryRepository {
             val lon = lonBase + (i * 0.005) - 0.01
 
             actividades.add(
-                ItineraryActivity(
+                ItineraryStop(
                     horaInicio = hora,
                     titulo = titulo,
                     descripcion = descripcion,

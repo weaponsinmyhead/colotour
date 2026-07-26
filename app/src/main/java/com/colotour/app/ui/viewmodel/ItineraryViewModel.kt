@@ -1,10 +1,10 @@
-package com.example.travelitinerary.ui.viewmodel
+package com.colotour.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.travelitinerary.data.model.Itinerary
-import com.example.travelitinerary.data.model.TravelPreferences
-import com.example.travelitinerary.data.repository.ItineraryRepository
+import com.colotour.app.data.model.Itinerary
+import com.colotour.app.data.model.TravelPreferences
+import com.colotour.app.data.repository.ItineraryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +18,7 @@ sealed interface ItineraryUiState {
 }
 
 class ItineraryViewModel(
-    private val repository: ItineraryRepository
+    private val repository: ItineraryRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ItineraryUiState>(ItineraryUiState.Idle)

@@ -1,9 +1,9 @@
-package com.example.travelitinerary.data.model
+package com.colotour.app.data.model
 
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ItineraryActivity(
+data class ItineraryStop(
     val horaInicio: String,
     val titulo: String,
     val descripcion: String,
@@ -16,7 +16,7 @@ data class ItineraryActivity(
 @Serializable
 data class Itinerary(
     val destino: String,
-    val actividades: List<ItineraryActivity>,
+    val actividades: List<ItineraryStop>,
     val duracionTotal: String,
     val costoTotalEstimado: String
 )

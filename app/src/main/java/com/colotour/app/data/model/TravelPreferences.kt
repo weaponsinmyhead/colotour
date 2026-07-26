@@ -1,4 +1,4 @@
-package com.example.travelitinerary.data.model
+package com.colotour.app.data.model
 
 import kotlinx.serialization.Serializable
 

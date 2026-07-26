@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.travelitinerary"
+    namespace = "com.colotour.app"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.travelitinerary"
+        applicationId = "com.colotour.app"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -79,7 +79,5 @@ dependencies {
   androidTestImplementation(libs.androidx.test.espresso.core)
 
   // Navigation
-  implementation(libs.androidx.navigation3.ui)
-  implementation(libs.androidx.navigation3.runtime)
-  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+  implementation(libs.androidx.navigation.compose)
 }

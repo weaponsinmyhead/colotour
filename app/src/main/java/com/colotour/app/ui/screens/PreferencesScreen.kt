@@ -1,4 +1,4 @@
-package com.example.travelitinerary.ui.screens
+package com.colotour.app.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.travelitinerary.data.model.*
+import com.colotour.app.data.model.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,11 +74,11 @@ fun PreferencesScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Duracion.values().forEach { item ->
+                    Duracion.entries.forEach { item ->
                         FilterChip(
                             selected = duracion == item,
                             onClick = { duracion = item },
@@ -102,7 +102,7 @@ fun PreferencesScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Movilidad.values().forEach { item ->
+                    Movilidad.entries.forEach { item ->
                         FilterChip(
                             selected = movilidad == item,
                             onClick = { movilidad = item },
@@ -140,11 +140,11 @@ fun PreferencesScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Presupuesto.values().forEach { item ->
+                    Presupuesto.entries.forEach { item ->
                         FilterChip(
                             selected = presupuesto == item,
                             onClick = { presupuesto = item },
@@ -170,13 +170,13 @@ fun PreferencesScreen(
                 colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
             )
             ExposedDropdownMenu(
                 expanded = estiloDropdownExpanded,
                 onDismissRequest = { estiloDropdownExpanded = false }
             ) {
-                EstiloTuristico.values().forEach { estilo ->
+                EstiloTuristico.entries.forEach { estilo ->
                     DropdownMenuItem(
                         text = { Text(estilo.descripcion) },
                         onClick = {
@@ -197,11 +197,11 @@ fun PreferencesScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Ritmo.values().forEach { item ->
+                    Ritmo.entries.forEach { item ->
                         FilterChip(
                             selected = ritmo == item,
                             onClick = { ritmo = item },
