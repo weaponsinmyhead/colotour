@@ -1,14 +1,14 @@
-plugins {
+﻿plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "com.colotour.app"
+    namespace = "com.wayfii.app"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.colotour.app"
+        applicationId = "com.wayfii.app"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -81,6 +81,9 @@ dependencies {
   // Navigation
   implementation(libs.androidx.navigation.compose)
   implementation(libs.kotlinx.serialization.json)
+
+  // Location
+  implementation(libs.play.services.location)
 
   // OpenStreetMap
   implementation(libs.osmdroid.android)
