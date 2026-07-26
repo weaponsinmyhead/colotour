@@ -1,5 +1,8 @@
 package com.colotour.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -123,7 +126,7 @@ fun ItineraryScreen(
                     }
                 }
                 is ItineraryUiState.Success -> {
-                    ItineraryDetails(itinerary = uiState.itinerary)
+                    ItineraryDetails(itinerary = uiState.itinerary, onBack = onBack)
                 }
             }
         }
@@ -131,11 +134,35 @@ fun ItineraryScreen(
 }
 
 @Composable
-fun ItineraryDetails(itinerary: Itinerary) {
+fun ItineraryDetails(itinerary: Itinerary, onBack: () -> Unit) {
     var selectedStopOrder by remember { mutableStateOf<Int?>(null) }
     val listState = rememberLazyListState()
 
-    val scrollOffset = 3 + (if (itinerary.isFallbackCoordinates) 1 else 0)
+    // Calcular estadísticas dinámicas del viaje
+    val totalStops = itinerary.actividades.size
+    val touristStops = itinerary.actividades.filter { it.type == StopType.PLACE }
+    val visualTypes = touristStops.map { it.visualType }
+    val dominantExperience = if (visualTypes.isEmpty()) {
+        "Exploración urbana"
+    } else {
+        val groups = visualTypes.groupBy { it }.maxByOrNull { it.value.size }
+        when (groups?.key) {
+            ActivityVisualType.NATURE -> "Naturaleza y Paisajes"
+            ActivityVisualType.ADVENTURE -> "Aventura y Trekking"
+            ActivityVisualType.CULTURE -> "Cultural e Histórica"
+            ActivityVisualType.HISTORY -> "Histórica"
+            ActivityVisualType.SHOPPING -> "Compras y Ocio"
+            ActivityVisualType.PHOTO -> "Fotografía y Vistas"
+            ActivityVisualType.EVENT -> "Eventos Locales"
+            ActivityVisualType.FAMILY -> "Familiar"
+            ActivityVisualType.MAINSTREAM -> "Atracciones Populares"
+            else -> "Exploración mixta"
+        }
+    }
+
+    // Offset dinámico por el header, banner de fallback y resumen estadístico
+    val scrollOffset = 4 + (if (itinerary.isFallbackCoordinates) 1 else 0)
+    
     LaunchedEffect(selectedStopOrder) {
         selectedStopOrder?.let { order ->
             val index = itinerary.actividades.indexOfFirst { it.order == order }
@@ -257,9 +284,13 @@ fun ItineraryDetails(itinerary: Itinerary) {
             }
         }
 
-        // Banner discreto de Fallback
-        if (itinerary.isFallbackCoordinates) {
-            item {
+        // Banner de Fallback con Animación
+        item {
+            AnimatedVisibility(
+                visible = itinerary.isFallbackCoordinates,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
@@ -286,7 +317,45 @@ fun ItineraryDetails(itinerary: Itinerary) {
             }
         }
 
-        // Mapa OSM integrado como protagonista
+        // Tarjeta de Resumen Estadístico del Viaje
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Resumen del Recorrido",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = "Total Paradas", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(text = "$totalStops paradas", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                        Column {
+                            Text(text = "Experiencia Dominante", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(text = dominantExperience, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                        Column {
+                            Text(text = "Recorrido", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(text = "Sugerido", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Mapa OSM integrado
         item {
             Card(
                 modifier = Modifier
@@ -335,13 +404,21 @@ fun ItineraryDetails(itinerary: Itinerary) {
 
         // Listado Cronológico
         item {
-            Text(
-                text = "Cronograma del Día",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Cronograma del Día",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                TextButton(onClick = onBack) {
+                    Text(text = "Ajustar preferencias", color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
         itemsIndexed(itinerary.actividades) { index, activity ->
