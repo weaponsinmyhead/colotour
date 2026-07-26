@@ -80,6 +80,7 @@ dependencies {
 
   // Navigation
   implementation(libs.androidx.navigation.compose)
+  implementation(libs.kotlinx.serialization.json)
 
   // OpenStreetMap
   implementation(libs.osmdroid.android)

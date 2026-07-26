@@ -16,14 +16,14 @@ import java.util.Locale
 @Composable
 fun PreferencesScreen(
     onGenerate: (TravelPreferences) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var destino by remember { mutableStateOf("") }
     var startingPointName by remember { mutableStateOf("") }
     val intereses = remember { mutableStateListOf(TourismInterest.CLASICO) }
     val movilidad = remember { mutableStateListOf(MobilityType.CAMINANDO) }
     var timeRange by remember { mutableStateOf(540f..1080f) } // 09:00 a 18:00 por defecto
-    var includeFoodStops by remember { mutableStateOf(true) }
+    var includeFoodStops by remember { mutableStateOf(value = true) }
     var cantidadPersonas by remember { mutableFloatStateOf(1f) }
     var presupuesto by remember { mutableStateOf(BudgetLevel.MEDIO) }
     var ritmo by remember { mutableStateOf(TravelPace.EQUILIBRADO) }

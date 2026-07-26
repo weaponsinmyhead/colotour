@@ -17,7 +17,7 @@ class ItineraryEngine(
         // 1. Resolver punto de partida y coordenadas mock del destino
         val hash = preferences.destino.lowercase().hashCode()
         val baseLat = -34.6037 + ((abs(hash) % 1000) * 0.0001)
-        val baseLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
+        val baseLon = -58.3816 + (((abs(hash) / 1000) % 1000) * 0.0001)
 
         val startingPoint = preferences.startingPointName.trim()
         val startPointName = startingPoint.ifEmpty { "Centro de la ciudad" }
@@ -50,7 +50,7 @@ class ItineraryEngine(
             endMinutes = preferences.endMinutes,
             ritmo = preferences.ritmo,
             includeFoodStops = preferences.includeFoodStops,
-            presupuesto = preferences.presupuesto
+            presupuesto = preferences.presupuesto,
         )
 
         // 6. Estimar costos finales
@@ -58,7 +58,7 @@ class ItineraryEngine(
             activities = plannedStops,
             cantidadPersonas = preferences.cantidadPersonas,
             movilidadSeleccionada = preferences.movilidad,
-            presupuesto = preferences.presupuesto
+            presupuesto = preferences.presupuesto,
         )
 
         // 7. Mapear a modelos públicos agregando orden, tipo y razones descriptivas

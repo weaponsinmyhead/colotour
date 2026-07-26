@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,7 +42,7 @@ fun ItineraryScreen(
                     IconButton(onClick = onBack) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
+                },
             )
         },
         modifier = modifier
@@ -233,7 +232,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                val hasCoordinates = itinerary.actividades.any { it.latitud != null && it.longitud != null }
+                val hasCoordinates = itinerary.actividades.any { (it.latitud != null) && (it.longitud != null) }
                 if (hasCoordinates) {
                     ItineraryMapView(
                         stops = itinerary.actividades,

@@ -5,7 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -67,7 +67,7 @@ fun ItineraryMapView(
             stops.forEach { stop ->
                 val lat = stop.latitud
                 val lon = stop.longitud
-                if (lat != null && lon != null) {
+                if ((lat != null) && (lon != null)) {
                     val point = GeoPoint(lat, lon)
                     geoPoints.add(point)
 

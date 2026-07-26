@@ -35,7 +35,7 @@ fun MainNavigation() {
           itineraryViewModel.generarItinerario(prefs)
           navController.navigate(ItineraryRoute)
         },
-        modifier = Modifier.safeDrawingPadding().padding(8.dp)
+        modifier = Modifier.safeDrawingPadding().padding(8.dp),
       )
     }
     composable<ItineraryRoute> {
@@ -47,7 +47,7 @@ fun MainNavigation() {
           itineraryViewModel.resetState()
           navController.popBackStack()
         },
-        modifier = Modifier.safeDrawingPadding()
+        modifier = Modifier.safeDrawingPadding(),
       )
     }
   }
