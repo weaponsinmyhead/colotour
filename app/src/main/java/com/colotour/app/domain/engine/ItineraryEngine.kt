@@ -1,11 +1,9 @@
 package com.colotour.app.domain.engine
 
-import com.colotour.app.data.model.BudgetLevel
-import com.colotour.app.data.model.Itinerary
-import com.colotour.app.data.model.ItineraryStop
-import com.colotour.app.data.model.TravelPreferences
+import com.colotour.app.data.model.*
 import com.colotour.app.data.repository.PlacesRepository
 import java.util.Locale
+import kotlin.math.abs
 
 class ItineraryEngine(
     private val placesRepository: PlacesRepository
@@ -16,105 +14,125 @@ class ItineraryEngine(
     private val costEstimator = CostEstimator()
 
     suspend fun generate(preferences: TravelPreferences): Itinerary {
-        // 1. Obtener candidatos locales
+        // 1. Resolver punto de partida y coordenadas mock del destino
+        val hash = preferences.destino.lowercase().hashCode()
+        val baseLat = -34.6037 + (abs(hash) % 1000) * 0.0001
+        val baseLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
+
+        val startingPoint = preferences.startingPointName.trim()
+        val startPointName = if (startingPoint.isEmpty()) "Centro de la ciudad" else startingPoint
+        val startPoint = StartPoint(name = startPointName, latitude = baseLat, longitude = baseLon)
+
+        // 2. Obtener candidatos locales
         val candidates = placesRepository.getCandidatePlaces(preferences.destino)
 
-        // 2. Puntuar afinidad
-        val scored = candidates.map { place ->
-            place to scorer.scorePlace(place, preferences)
-        }.sortedByDescending { it.second }
+        // 3. Seleccionar los mejores candidatos incentivando la diversidad de intereses
+        val selectedCandidates = mutableListOf<CandidatePlace>()
+        val availableCandidates = candidates.toMutableList()
+        val seenInterests = mutableSetOf<TourismInterest>()
 
-        // Tomar hasta los 10 mejores para trazar ruta
-        val bestCandidates = scored.take(10).map { it.first }
+        for (step in 1..10) {
+            if (availableCandidates.isEmpty()) break
+            val best = availableCandidates.maxByOrNull { scorer.scorePlace(it, preferences, seenInterests) } ?: break
+            selectedCandidates.add(best)
+            availableCandidates.remove(best)
+            seenInterests.add(best.estilo)
+        }
 
-        // 3. Optimizar ruta (Nearest Neighbor)
-        val optimizedRoute = routeOptimizer.optimizeRoute(bestCandidates)
+        // 4. Resolver orden del recorrido desde el punto de partida (Nearest Neighbor)
+        val optimizedRoute = routeOptimizer.optimizeRoute(startPoint, selectedCandidates)
 
-        // 4. Planificar los tiempos
-        val plannedActivities = timePlanner.planTimes(
+        // 5. Planificar tiempos (sin solapamiento, con comidas integradas)
+        val plannedStops = timePlanner.planTimes(
             places = optimizedRoute,
             startMinutes = preferences.startMinutes,
             endMinutes = preferences.endMinutes,
-            ritmo = preferences.ritmo
+            ritmo = preferences.ritmo,
+            includeFoodStops = preferences.includeFoodStops,
+            presupuesto = preferences.presupuesto
         )
 
-        // 5. Intercalar paradas de comida y punto de partida
-        val finalStops = mutableListOf<ItineraryStop>()
-        var foodStopsCount = 0
-
-        val startingPoint = preferences.startingPointName.trim()
-        if (startingPoint.isNotEmpty()) {
-            val startHour = preferences.startMinutes / 60
-            val startMin = preferences.startMinutes % 60
-            finalStops.add(
-                ItineraryStop(
-                    horaInicio = String.format(Locale.getDefault(), "%02d:%02d", startHour, startMin),
-                    titulo = "Punto de Partida",
-                    descripcion = "Inicio del recorrido desde: $startingPoint",
-                    duracionEstimada = "0m",
-                    costoEstimado = "Gratuito"
-                )
-            )
-        }
-
-        var breakfastAdded = false
-        var lunchAdded = false
-        var dinnerAdded = false
-
-        for (i in plannedActivities.indices) {
-            val activity = plannedActivities[i]
-            val currentMinutes = parseTimeToMinutes(activity.horaInicio)
-
-            if (preferences.includeFoodStops) {
-                // Desayuno (08:00 - 11:00)
-                if (currentMinutes in 480..660 && !breakfastAdded) {
-                    finalStops.add(createFoodStop(currentMinutes, "Desayuno / Café", preferences.presupuesto))
-                    breakfastAdded = true
-                    foodStopsCount++
-                }
-                // Almuerzo (12:00 - 15:00)
-                else if (currentMinutes in 720..900 && !lunchAdded) {
-                    finalStops.add(createFoodStop(currentMinutes, "Almuerzo", preferences.presupuesto))
-                    lunchAdded = true
-                    foodStopsCount++
-                }
-                // Cena (18:00 - 22:00)
-                else if (currentMinutes in 1080..1320 && !dinnerAdded) {
-                    finalStops.add(createFoodStop(currentMinutes, "Cena o Merienda", preferences.presupuesto))
-                    dinnerAdded = true
-                    foodStopsCount++
-                }
-            }
-
-            // Determinar costo unitario de la actividad
-            val costText = if (preferences.presupuesto == BudgetLevel.GRATUITO || activity.place.presupuesto == BudgetLevel.GRATUITO) {
-                "Gratuito"
-            } else {
-                val cost = activity.place.costoBasePorPersona * preferences.cantidadPersonas
-                "$${String.format(Locale.getDefault(), "%.0f", cost)} USD"
-            }
-
-            finalStops.add(
-                ItineraryStop(
-                    horaInicio = activity.horaInicio,
-                    titulo = activity.place.nombre,
-                    descripcion = "${activity.place.descripcion} (Categoría: ${activity.place.estilo.descripcion})",
-                    duracionEstimada = activity.duracionEstimada,
-                    costoEstimado = costText,
-                    latitud = activity.place.latitud,
-                    longitud = activity.place.longitud
-                )
-            )
-        }
-
-        // 6. Estimar costos finales del recorrido
+        // 6. Estimar costos finales
         val costResult = costEstimator.estimateCosts(
-            activities = plannedActivities,
+            activities = plannedStops,
             cantidadPersonas = preferences.cantidadPersonas,
             movilidadSeleccionada = preferences.movilidad,
-            presupuesto = preferences.presupuesto,
-            comidasAgregadasCount = foodStopsCount
+            presupuesto = preferences.presupuesto
         )
+
+        // 7. Mapear a modelos públicos agregando orden, tipo y razones descriptivas
+        val finalStops = mutableListOf<ItineraryStop>()
+        
+        // Agregar parada inicial
+        val startHour = preferences.startMinutes / 60
+        val startMin = preferences.startMinutes % 60
+        finalStops.add(
+            ItineraryStop(
+                order = 1,
+                type = StopType.START,
+                horaInicio = String.format(Locale.getDefault(), "%02d:%02d", startHour, startMin),
+                titulo = "Inicio: $startPointName",
+                descripcion = "Comienzo del recorrido de exploración.",
+                duracionEstimada = "0m",
+                costoEstimado = "Gratuito",
+                latitud = startPoint.latitude,
+                longitud = startPoint.longitude,
+                reason = "Punto de partida configurado."
+            )
+        )
+
+        // Mapear paradas planificadas
+        plannedStops.forEachIndexed { index, planned ->
+            val orderNumber = index + 2
+            when (planned) {
+                is PlannedStop.PlaceStop -> {
+                    val place = planned.place
+                    val costForActivity = costResult.activityCosts[place.id] ?: 0.0
+                    val costText = if (preferences.presupuesto == BudgetLevel.GRATUITO || place.presupuesto == BudgetLevel.GRATUITO) {
+                        "Gratuito"
+                    } else {
+                        "$${String.format(Locale.getDefault(), "%.0f", costForActivity)} USD"
+                    }
+
+                    val reason = if (preferences.intereses.contains(place.estilo)) {
+                        "Elegido por tu interés en ${place.estilo.descripcion}."
+                    } else {
+                        "Sugerido por alta afinidad y cercanía en la ruta."
+                    }
+
+                    finalStops.add(
+                        ItineraryStop(
+                            order = orderNumber,
+                            type = StopType.PLACE,
+                            horaInicio = planned.horaInicio,
+                            titulo = place.nombre,
+                            descripcion = "${place.descripcion} (Categoría: ${place.estilo.descripcion})",
+                            duracionEstimada = planned.duracionEstimada,
+                            costoEstimado = costText,
+                            latitud = place.latitud,
+                            longitud = place.longitud,
+                            reason = reason
+                        )
+                    )
+                }
+                is PlannedStop.FoodStop -> {
+                    finalStops.add(
+                        ItineraryStop(
+                            order = orderNumber,
+                            type = StopType.FOOD,
+                            horaInicio = planned.horaInicio,
+                            titulo = planned.titulo,
+                            descripcion = planned.descripcion,
+                            duracionEstimada = planned.duracionEstimada,
+                            costoEstimado = planned.costoEstimado,
+                            latitud = null,
+                            longitud = null,
+                            reason = "Programado según tu horario de viaje y presupuesto."
+                        )
+                    )
+                }
+            }
+        }
 
         val totalCostoText = if (preferences.presupuesto == BudgetLevel.GRATUITO) {
             "Gratuito o gasto opcional"
@@ -122,8 +140,6 @@ class ItineraryEngine(
             "Est. $${String.format(Locale.getDefault(), "%.0f", costResult.totalCost)} USD"
         }
 
-        val startHour = preferences.startMinutes / 60
-        val startMin = preferences.startMinutes % 60
         val endHour = preferences.endMinutes / 60
         val endMin = preferences.endMinutes % 60
         val rangoHorarioText = String.format(Locale.getDefault(), "%02d:%02d a %02d:%02d", startHour, startMin, endHour, endMin)
@@ -134,52 +150,10 @@ class ItineraryEngine(
             actividades = finalStops,
             duracionTotal = duracionTotalString,
             costoTotalEstimado = totalCostoText,
-            puntoPartida = if (startingPoint.isEmpty()) "Centro de la ciudad" else startingPoint,
+            puntoPartida = startPointName,
             rangoHorarioText = rangoHorarioText,
             incluyeComida = preferences.includeFoodStops,
             cantidadPersonas = preferences.cantidadPersonas
-        )
-    }
-
-    private fun parseTimeToMinutes(time: String): Int {
-        val parts = time.split(":")
-        return parts[0].toInt() * 60 + parts[1].toInt()
-    }
-
-    private fun createFoodStop(minutes: Int, tipo: String, presupuesto: BudgetLevel): ItineraryStop {
-        val hour = minutes / 60
-        val min = minutes % 60
-        val horaInicio = String.format(Locale.getDefault(), "%02d:%02d", hour, min)
-
-        val (titulo, descripcion, costo) = when (presupuesto) {
-            BudgetLevel.GRATUITO -> Triple(
-                "$tipo al aire libre",
-                "Picnic o mercado local al aire libre con opciones gratuitas.",
-                "Gratuito o consumo opcional"
-            )
-            BudgetLevel.BAJO -> Triple(
-                "$tipo económico",
-                "Establecimiento informal de comida rápida local.",
-                "Gasto mínimo"
-            )
-            BudgetLevel.MEDIO -> Triple(
-                "$tipo tradicional",
-                "Restaurante típico de menú del día o cafetería céntrica.",
-                "Gasto moderado"
-            )
-            BudgetLevel.ALTO -> Triple(
-                "$tipo gourmet",
-                "Bistró recomendado para degustar gastronomía de primer nivel.",
-                "Gasto alto"
-            )
-        }
-
-        return ItineraryStop(
-            horaInicio = horaInicio,
-            titulo = titulo,
-            descripcion = descripcion,
-            duracionEstimada = "1h 00m",
-            costoEstimado = costo
         )
     }
 }

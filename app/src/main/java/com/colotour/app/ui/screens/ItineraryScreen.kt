@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.colotour.app.data.model.Itinerary
+import com.colotour.app.data.model.StopType
 import com.colotour.app.ui.viewmodel.ItineraryUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,7 +115,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Encabezado de la Ciudad con Resumen
+        // Cabecera del Itinerario
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -127,7 +129,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    
+
                     // Fila 1: Punto de partida y Horario
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -163,7 +165,7 @@ fun ItineraryDetails(itinerary: Itinerary) {
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
-                    
+
                     // Fila 2: Personas y Comidas
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -198,11 +200,11 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             )
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     // Presupuesto total
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -292,17 +294,23 @@ fun ItineraryDetails(itinerary: Itinerary) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.width(24.dp)
                 ) {
+                    val bulletColor = when (activity.type) {
+                        StopType.START -> MaterialTheme.colorScheme.tertiary
+                        StopType.FOOD -> Color(0xFFFF9800)
+                        StopType.PLACE -> MaterialTheme.colorScheme.primary
+                    }
+
                     Box(
                         modifier = Modifier
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                            .background(bulletColor)
                     )
                     if (index < itinerary.actividades.size - 1) {
                         Box(
                             modifier = Modifier
                                 .width(2.dp)
-                                .height(120.dp)
+                                .height(130.dp)
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                         )
                     }
@@ -325,7 +333,13 @@ fun ItineraryDetails(itinerary: Itinerary) {
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.secondary
                             )
-                            Badge {
+                            Badge(
+                                containerColor = when (activity.type) {
+                                    StopType.START -> MaterialTheme.colorScheme.tertiaryContainer
+                                    StopType.FOOD -> Color(0xFFFFE0B2)
+                                    StopType.PLACE -> MaterialTheme.colorScheme.primaryContainer
+                                }
+                            ) {
                                 Text(activity.duracionEstimada)
                             }
                         }
@@ -341,6 +355,27 @@ fun ItineraryDetails(itinerary: Itinerary) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        
+                        // Renderizar Reason si está presente
+                        if (activity.reason.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (activity.type == StopType.FOOD) Icons.Default.Info else Icons.Default.Star,
+                                    contentDescription = "Razón",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = activity.reason,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,

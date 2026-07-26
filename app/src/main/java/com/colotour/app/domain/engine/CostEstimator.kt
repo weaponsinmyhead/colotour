@@ -5,31 +5,42 @@ import com.colotour.app.data.model.MobilityType
 
 class CostEstimator {
     fun estimateCosts(
-        activities: List<PlannedActivity>,
+        activities: List<PlannedStop>,
         cantidadPersonas: Int,
         movilidadSeleccionada: Set<MobilityType>,
-        presupuesto: BudgetLevel,
-        comidasAgregadasCount: Int
+        presupuesto: BudgetLevel
     ): CostResult {
-        if (presupuesto == BudgetLevel.GRATUITO) {
-            return CostResult(
-                totalCost = 0.0,
-                activityCosts = activities.associate { it.place.id to 0.0 },
-                transportCost = 0.0,
-                foodCost = 0.0
-            )
-        }
-
         var totalActivitiesCost = 0.0
         val activityCosts = mutableMapOf<String, Double>()
+        var foodCost = 0.0
 
-        for (act in activities) {
-            val cost = act.place.costoBasePorPersona * cantidadPersonas
-            totalActivitiesCost += cost
-            activityCosts[act.place.id] = cost
+        val foodStops = activities.filterIsInstance<PlannedStop.FoodStop>()
+        val placeStops = activities.filterIsInstance<PlannedStop.PlaceStop>()
+
+        // 1. Costo estimado de comida
+        val costPerMeal = when (presupuesto) {
+            BudgetLevel.GRATUITO -> 0.0
+            BudgetLevel.BAJO -> 8.0
+            BudgetLevel.MEDIO -> 20.0
+            BudgetLevel.ALTO -> 45.0
+        }
+        foodCost = costPerMeal * foodStops.size * cantidadPersonas
+
+        // 2. Costo de atracciones
+        if (presupuesto != BudgetLevel.GRATUITO) {
+            for (act in placeStops) {
+                val cost = act.place.costoBasePorPersona * cantidadPersonas
+                totalActivitiesCost += cost
+                activityCosts[act.place.id] = cost
+            }
+        } else {
+            // Si es gratuito, todas las atracciones son costo 0
+            for (act in placeStops) {
+                activityCosts[act.place.id] = 0.0
+            }
         }
 
-        // Costo de transporte estimado promedio
+        // 3. Costo de transporte
         val numTransitos = if (activities.size > 1) activities.size - 1 else 0
         val averageTransportCost = if (movilidadSeleccionada.isEmpty()) {
             2.0
@@ -37,7 +48,7 @@ class CostEstimator {
             movilidadSeleccionada.map { mobility ->
                 when (mobility) {
                     MobilityType.CAMINANDO -> 0.0
-                    MobilityType.BICICLETA -> 1.5
+                    MobilityType.BICICLETA -> 0.0 // Caminando y Bici mantienen costo 0
                     MobilityType.TRANSPORTE_PUBLICO -> 2.0
                     MobilityType.AUTO -> 6.0
                     MobilityType.TAXI_APP -> 10.0
@@ -47,21 +58,13 @@ class CostEstimator {
         }
         val totalTransportCost = averageTransportCost * numTransitos * cantidadPersonas
 
-        // Costo estimado de comida
-        val costPerMeal = when (presupuesto) {
-            BudgetLevel.GRATUITO -> 0.0
-            BudgetLevel.BAJO -> 8.0
-            BudgetLevel.MEDIO -> 20.0
-            BudgetLevel.ALTO -> 45.0
-        }
-        val totalFoodCost = costPerMeal * comidasAgregadasCount * cantidadPersonas
-        val totalCost = totalActivitiesCost + totalTransportCost + totalFoodCost
+        val totalCost = totalActivitiesCost + totalTransportCost + foodCost
 
         return CostResult(
             totalCost = totalCost,
             activityCosts = activityCosts,
             transportCost = totalTransportCost,
-            foodCost = totalFoodCost
+            foodCost = foodCost
         )
     }
 }
@@ -72,3 +75,4 @@ data class CostResult(
     val transportCost: Double,
     val foodCost: Double
 )
+

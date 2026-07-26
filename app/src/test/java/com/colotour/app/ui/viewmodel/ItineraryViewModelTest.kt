@@ -34,7 +34,11 @@ class ItineraryViewModelTest {
                         destino = "Test",
                         actividades = emptyList(),
                         duracionTotal = "2h",
-                        costoTotalEstimado = "0"
+                        costoTotalEstimado = "0",
+                        puntoPartida = "Test Start",
+                        rangoHorarioText = "09:00 a 18:00",
+                        incluyeComida = true,
+                        cantidadPersonas = 1
                     )
                 )
             }
@@ -42,12 +46,15 @@ class ItineraryViewModelTest {
         val viewModel = ItineraryViewModel(repository)
         val prefs = TravelPreferences(
             destino = "Test",
-            duracion = Duracion.DURACION_2H,
-            movilidad = Movilidad.CAMINANDO,
+            intereses = setOf(TourismInterest.CULTURAL),
+            movilidad = setOf(MobilityType.CAMINANDO),
+            startMinutes = 540,
+            endMinutes = 1080,
+            startingPointName = "Test Start",
+            includeFoodStops = true,
             cantidadPersonas = 1,
-            presupuesto = Presupuesto.BAJO,
-            estiloTuristico = EstiloTuristico.CULTURAL,
-            ritmo = Ritmo.EQUILIBRADO
+            presupuesto = BudgetLevel.BAJO,
+            ritmo = TravelPace.EQUILIBRADO
         )
 
         viewModel.generarItinerario(prefs)
