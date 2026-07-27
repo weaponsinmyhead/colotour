@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="400dp"
+    android:height="240dp"
+    android:viewportWidth="400"
+    android:viewportHeight="240">
+    <path android:pathData="M0,0h400v240h-400z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="400"
+                android:endY="240"
+                android:type="linear">
+                <item android:color="#FF4A148C" android:offset="0.0"/>
+                <item android:color="#FF880E4F" android:offset="0.5"/>
+                <item android:color="#FF311B92" android:offset="1.0"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Geometric graffiti art accents -->
+    <path
+        android:fillColor="#33FF4081"
+        android:pathData="M50,20 L350,220 L300,240 L0,40 Z"/>
+    <path
+        android:fillColor="#33FFD700"
+        android:pathData="M250,0 L400,150 L350,240 L150,50 Z"/>
+</vector>

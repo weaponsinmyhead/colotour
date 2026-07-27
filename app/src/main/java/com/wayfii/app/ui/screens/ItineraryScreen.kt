@@ -1,4 +1,4 @@
-﻿package com.wayfii.app.ui.screens
+package com.wayfii.app.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -17,48 +18,54 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.wayfii.app.data.model.ActivityVisualType
-import com.wayfii.app.data.model.Itinerary
-import com.wayfii.app.data.model.ItineraryStop
-import com.wayfii.app.data.model.StopType
+import com.wayfii.app.data.model.*
 import com.wayfii.app.ui.components.*
 import com.wayfii.app.ui.viewmodel.ItineraryUiState
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ItineraryScreen — Rediseño: Mapa como protagonista (Escenario Vivo)
-// ─────────────────────────────────────────────────────────────────────────────
+private val ScreenBg = Color(0xFFF8F9FA)
+private val CardBg = Color.White
+private val BorderCol = Color(0xFFE2E8F0)
+private val TextDark = Color(0xFF0F172A)
+private val TextMuted = Color(0xFF64748B)
+private val TealAccent = Color(0xFF00897B)
+private val CoralAccent = Color(0xFFFF5A5F)
+
 @Composable
 fun ItineraryScreen(
     uiState: ItineraryUiState,
     onBack: () -> Unit,
+    onSelectProposal: (AdventureProposal) -> Unit = {},
+    onToggleStop: (Int) -> Unit = {},
+    onToggleSideQuest: (String) -> Unit = {},
+    onFinishAdventure: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(ScreenBg)
     ) {
         when (uiState) {
             is ItineraryUiState.Idle -> {
                 EmptyState(
                     icon = Icons.Default.LocationOn,
-                    title = "Planifica tu aventura",
-                    subtitle = "Define tus preferencias para crear el mapa de tu día"
+                    title = "Descubrí tu aventura",
+                    subtitle = "Ingresá tu ubicación y tiempo disponible para encontrar aventuras"
                 )
             }
 
             is ItineraryUiState.Loading -> {
                 LoadingState(
-                    title = "Dibujando tu mapa…",
-                    subtitle = "Buscando rutas y tesoros locales"
+                    title = "Diseñando aventuras...",
+                    subtitle = "Buscando gemas ocultas y experiencias únicas"
                 )
             }
 
@@ -69,9 +76,24 @@ fun ItineraryScreen(
                 )
             }
 
-            is ItineraryUiState.Success -> {
-                ItineraryMapCentricView(
-                    itinerary = uiState.itinerary,
+            is ItineraryUiState.ProposalsLoaded -> {
+                AdventureProposalsScreen(
+                    proposals = uiState.proposals,
+                    preferences = uiState.preferences,
+                    onSelectProposal = onSelectProposal,
+                    onBack = onBack
+                )
+            }
+
+            is ItineraryUiState.AdventureActive -> {
+                ActiveAdventureQuestView(
+                    proposal = uiState.selectedProposal,
+                    completedStopOrders = uiState.completedStopOrders,
+                    discoveredSideQuestIds = uiState.discoveredSideQuestIds,
+                    isFinished = uiState.isFinished,
+                    onToggleStop = onToggleStop,
+                    onToggleSideQuest = onToggleSideQuest,
+                    onFinishAdventure = onFinishAdventure,
                     onBack = onBack
                 )
             }
@@ -80,17 +102,27 @@ fun ItineraryScreen(
 }
 
 @Composable
-fun ItineraryMapCentricView(
-    itinerary: Itinerary,
+fun ActiveAdventureQuestView(
+    proposal: AdventureProposal,
+    completedStopOrders: Set<Int>,
+    discoveredSideQuestIds: Set<String>,
+    isFinished: Boolean,
+    onToggleStop: (Int) -> Unit,
+    onToggleSideQuest: (String) -> Unit,
+    onFinishAdventure: () -> Unit,
     onBack: () -> Unit
 ) {
-    var selectedStopOrder by remember { mutableStateOf<Int?>(itinerary.actividades.firstOrNull()?.order) }
+    var selectedStopOrder by remember { mutableStateOf<Int?>(proposal.mainQuestStops.firstOrNull()?.order) }
     val carouselState = rememberLazyListState()
 
-    // Sincronizar carrusel cuando se selecciona desde el mapa
+    val totalMainStops = proposal.mainQuestStops.size
+    val completedCount = proposal.mainQuestStops.count { completedStopOrders.contains(it.order) }
+    val progressFraction = if (totalMainStops > 0) completedCount.toFloat() / totalMainStops else 0f
+    val progressPercent = (progressFraction * 100).toInt()
+
     LaunchedEffect(selectedStopOrder) {
         selectedStopOrder?.let { order ->
-            val index = itinerary.actividades.indexOfFirst { it.order == order }
+            val index = proposal.mainQuestStops.indexOfFirst { it.order == order }
             if (index != -1) {
                 carouselState.animateScrollToItem(index)
             }
@@ -98,36 +130,23 @@ fun ItineraryMapCentricView(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. CAPA BASE: EL MAPA (Protagonista)
-        val hasCoordinates = itinerary.actividades.any { it.latitud != null && it.longitud != null }
-        
-        if (hasCoordinates) {
-            ItineraryMapView(
-                stops = itinerary.actividades,
-                selectedStopOrder = selectedStopOrder,
-                onMarkerClick = { order -> selectedStopOrder = order },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            // Fallback visual si no hay mapa
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.background)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Mapa no disponible", style = MaterialTheme.typography.titleLarge)
-            }
-        }
+        // 1. Map Layer
+        ItineraryMapView(
+            stops = proposal.mainQuestStops,
+            selectedStopOrder = selectedStopOrder,
+            onMarkerClick = { order -> selectedStopOrder = order },
+            completedStopOrders = completedStopOrders,
+            sideQuests = proposal.sideQuests,
+            onSideQuestClick = { sq -> onToggleSideQuest(sq.id) },
+            modifier = Modifier.fillMaxSize()
+        )
 
-        // 2. CAPA SUPERIOR: HEADER FLOTANTE
-        FloatingHeader(
-            destino = itinerary.destino,
-            horario = itinerary.rangoHorarioText,
+        // 2. RPG Header Bar & Progress Indicator
+        FloatingQuestHeader(
+            proposal = proposal,
+            completedCount = completedCount,
+            totalMainStops = totalMainStops,
+            progressPercent = progressPercent,
             onBack = onBack,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -135,36 +154,32 @@ fun ItineraryMapCentricView(
                 .padding(16.dp)
         )
 
-        // 3. CAPA MEDIA: RESUMEN FLOTANTE (Pills)
-        Column(
+        // 3. Floating Side Quests Badge Count
+        Surface(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = 110.dp, start = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(top = 135.dp, start = 16.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = CardBg.copy(alpha = 0.95f),
+            border = BorderStroke(1.dp, BorderCol),
+            shadowElevation = 4.dp
         ) {
-            FloatingPill(
-                icon = Icons.Default.Person,
-                text = "${itinerary.cantidadPersonas}",
-                containerColor = MaterialTheme.colorScheme.surface,
-                iconTint = MaterialTheme.colorScheme.secondary
-            )
-            FloatingPill(
-                icon = Icons.Default.Star,
-                text = itinerary.costoTotalEstimado.split("(").first().trim(),
-                containerColor = MaterialTheme.colorScheme.surface,
-                iconTint = MaterialTheme.colorScheme.tertiary
-            )
-            if (itinerary.incluyeComida) {
-                FloatingPill(
-                    icon = Icons.Default.Favorite,
-                    text = "Gastro",
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    iconTint = Color(0xFFFF9800)
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text("✨ Side Quests:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextDark)
+                Text(
+                    text = "${discoveredSideQuestIds.size}/${proposal.sideQuests.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = TealAccent
                 )
             }
         }
 
-        // 4. CAPA INFERIOR: CARRUSEL DE PARADAS
+        // 4. Quest Stops Carousel
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -174,202 +189,281 @@ fun ItineraryMapCentricView(
             LazyRow(
                 state = carouselState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                items(itinerary.actividades) { activity ->
-                    CarouselCard(
-                        activity = activity,
-                        isSelected = activity.order == selectedStopOrder,
-                        onClick = { selectedStopOrder = activity.order },
-                        modifier = Modifier.width(300.dp)
+                items(proposal.mainQuestStops) { stop ->
+                    val isCompleted = completedStopOrders.contains(stop.order)
+                    QuestStopCard(
+                        stop = stop,
+                        isSelected = stop.order == selectedStopOrder,
+                        isCompleted = isCompleted,
+                        onClick = { selectedStopOrder = stop.order },
+                        onToggleComplete = { onToggleStop(stop.order) },
+                        modifier = Modifier.width(310.dp)
                     )
                 }
             }
+        }
+
+        // 5. Celebration Dialog Overlay
+        if (isFinished) {
+            CelebrationOverlay(
+                proposal = proposal,
+                completedCount = completedCount,
+                discoveredSideQuestsCount = discoveredSideQuestIds.size,
+                onDismiss = onBack
+            )
         }
     }
 }
 
 @Composable
-private fun FloatingHeader(
-    destino: String,
-    horario: String,
+private fun FloatingQuestHeader(
+    proposal: AdventureProposal,
+    completedCount: Int,
+    totalMainStops: Int,
+    progressPercent: Int,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        shape = RoundedCornerShape(20.dp),
+        color = CardBg.copy(alpha = 0.96f),
         tonalElevation = 6.dp,
         shadowElevation = 8.dp,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, BorderCol)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = destino,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = horario,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Ajustar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CarouselCard(
-    activity: ItineraryStop,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val scale = if (isSelected) 1f else 0.95f
-    
-    Card(
-        modifier = modifier
-            .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.surface 
-                             else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 10.dp else 2.dp
-        ),
-        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) 
-                 else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .height(100.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Icono/Miniatura con fondo lúdico
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(getVisualTypeBgColor(activity.visualType)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = stopTypeIcon(activity.visualType),
-                    contentDescription = null,
-                    tint = getVisualTypeIconColor(activity.visualType),
-                    modifier = Modifier.size(32.dp)
-                )
-                // Orden en pequeño
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(4.dp)
-                        .size(20.dp)
-                        .background(Color.White.copy(alpha = 0.8f), CircleShape),
-                    contentAlignment = Alignment.Center
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = TextDark
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${proposal.emoji} ${proposal.title}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = TextDark,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Main Quest · $completedCount de $totalMainStops completados",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TealAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = TealAccent.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "${activity.order}",
-                        style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        text = "$progressPercent%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TealAccent,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
 
-            Column(modifier = Modifier.weight(1f)) {
+            // Progress Bar
+            LinearProgressIndicator(
+                progress = { (completedCount.toFloat() / totalMainStops).coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape),
+                color = TealAccent,
+                trackColor = Color(0xFFE2E8F0)
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuestStopCard(
+    stop: ItineraryStop,
+    isSelected: Boolean,
+    isCompleted: Boolean,
+    onClick: () -> Unit,
+    onToggleComplete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Main Quest ${stop.order}: ${stop.titulo}" },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCompleted) Color(0xFFF0FDF4) else CardBg
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp),
+        border = BorderStroke(
+            if (isSelected) 2.dp else 1.dp,
+            if (isCompleted) Color(0xFF22C55E) else if (isSelected) TealAccent else BorderCol
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (isCompleted) Color(0xFF22C55E) else TealAccent.copy(alpha = 0.15f),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (isCompleted) "✓" else "${stop.order}",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isCompleted) Color.White else TealAccent,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stop.horaInicio,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TealAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = stop.titulo,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Text(
+                text = stop.descripcion,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Complete button
+            Button(
+                onClick = onToggleComplete,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isCompleted) Color(0xFF22C55E) else TealAccent,
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
                 Text(
-                    text = activity.horaInicio,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    text = if (isCompleted) "✓ Misión Completada" else "Marcar como completada",
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = activity.titulo,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = activity.descripcion,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers visuales
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
-private fun getVisualTypeBgColor(visualType: ActivityVisualType): Color {
-    return when (visualType) {
-        ActivityVisualType.NATURE -> Color(0xFFE8F5E9)
-        ActivityVisualType.ADVENTURE -> Color(0xFFFFF3E0)
-        ActivityVisualType.FOOD -> Color(0xFFFFEBEE)
-        ActivityVisualType.CULTURE -> Color(0xFFE8EAF6)
-        ActivityVisualType.HISTORY -> Color(0xFFEFEBE9)
-        ActivityVisualType.PHOTO -> Color(0xFFE0F7FA)
-        else -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+private fun CelebrationOverlay(
+    proposal: AdventureProposal,
+    completedCount: Int,
+    discoveredSideQuestsCount: Int,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.65f))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = CardBg,
+            shadowElevation = 12.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(text = "🎉", fontSize = 48.sp)
+                Text(
+                    text = "¡Aventura Completada!",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    color = TextDark
+                )
+                Text(
+                    text = "Completaste exitosamente ${proposal.title}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextMuted
+                )
+
+                HorizontalDivider(color = BorderCol)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    CelebrationStatItem(label = "Distancia", value = proposal.distanceText)
+                    CelebrationStatItem(label = "Main Quest", value = "$completedCount/${proposal.mainQuestStops.size}")
+                    CelebrationStatItem(label = "Side Quests", value = "$discoveredSideQuestsCount")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CoralAccent, contentColor = Color.White)
+                ) {
+                    Text("¡Excelente! Volver al inicio", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun getVisualTypeIconColor(visualType: ActivityVisualType): Color {
-    return when (visualType) {
-        ActivityVisualType.NATURE -> Color(0xFF2E7D32)
-        ActivityVisualType.ADVENTURE -> Color(0xFFEF6C00)
-        ActivityVisualType.FOOD -> Color(0xFFC62828)
-        ActivityVisualType.CULTURE -> Color(0xFF3F51B5)
-        ActivityVisualType.HISTORY -> Color(0xFF5D4037)
-        ActivityVisualType.PHOTO -> Color(0xFF0097A7)
-        else -> MaterialTheme.colorScheme.primary
-    }
-}
-
-private fun stopTypeIcon(visualType: ActivityVisualType): ImageVector {
-    return when (visualType) {
-        ActivityVisualType.START      -> Icons.Default.Home
-        ActivityVisualType.FOOD       -> Icons.Default.Favorite
-        ActivityVisualType.NATURE     -> Icons.Default.FavoriteBorder
-        ActivityVisualType.ADVENTURE  -> Icons.Default.LocationOn
-        ActivityVisualType.CULTURE    -> Icons.Default.Star
-        ActivityVisualType.HISTORY    -> Icons.Default.Info
-        ActivityVisualType.SHOPPING   -> Icons.Default.ShoppingCart
-        ActivityVisualType.PHOTO      -> Icons.Default.Place
-        ActivityVisualType.EVENT      -> Icons.Default.DateRange
-        ActivityVisualType.FAMILY     -> Icons.Default.Person
-        ActivityVisualType.MAINSTREAM -> Icons.Default.Star
-        ActivityVisualType.DEFAULT    -> Icons.Default.LocationOn
+private fun CelebrationStatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = TealAccent)
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
     }
 }
