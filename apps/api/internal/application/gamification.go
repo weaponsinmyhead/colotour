@@ -53,16 +53,16 @@ func NewGamificationCommands(
 func (commands GamificationCommands) RecordActivity(
 	ctx context.Context,
 	activity domain.Activity,
-) (domain.PlayerProfile, bool, error) {
+) (domain.ActivityReward, error) {
 	if err := activity.Validate(); err != nil {
-		return domain.PlayerProfile{}, false, err
+		return domain.ActivityReward{}, err
 	}
 	now := commands.clock.Now()
 	if activity.OccurredAt.After(now.Add(5 * time.Minute)) {
-		return domain.PlayerProfile{}, false, errors.New("occurredAt cannot be in the future")
+		return domain.ActivityReward{}, errors.New("occurredAt cannot be in the future")
 	}
 	if activity.OccurredAt.Before(now.AddDate(0, 0, -30)) {
-		return domain.PlayerProfile{}, false, errors.New("activities older than 30 days cannot be recorded")
+		return domain.ActivityReward{}, errors.New("activities older than 30 days cannot be recorded")
 	}
 	activity.ID = commands.ids.NewID()
 	activity.RecordedAt = now

@@ -31,10 +31,28 @@ flowchart LR
 Los valores son política configurable y requieren experimentación. Las
 redenciones puntúan poco para evitar un sistema “pay-to-win”.
 
+## Incremento implementado
+
+El MVP ya cierra el primer loop desde Android hasta la API:
+
+1. el viajero marca una parada como completada;
+2. Android registra la recompensa inmediatamente en un ledger local;
+3. la actividad queda en una cola persistente si no hay conexión;
+4. la API procesa el reintento con una clave idempotente por viajero, actividad,
+   sujeto y día;
+5. el servidor devuelve puntos otorgados, nuevos badges y perfil actualizado;
+6. la interfaz muestra nivel, puntos, racha y estado de sincronización.
+
+La identidad actual es pseudónima y corresponde a una instalación. Es una
+decisión transitoria para probar el loop sin bloquear el producto con login.
+No constituye autenticación ni prueba de presencia. Las Side Quests sintéticas
+no generan puntos hasta estar respaldadas por una entidad verificable del
+catálogo.
+
 ## Controles necesarios antes de producción
 
-- idempotencia por actividad;
-- sesión autenticada;
+- autenticación y migración del perfil anónimo;
+- identidad de la actividad derivada de la sesión, no del cuerpo enviado;
 - ventana temporal y distancia razonable;
 - señales de dispositivo con consentimiento;
 - límites por usuario/día;

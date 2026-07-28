@@ -13,6 +13,7 @@ selectivo.
 - planificación de itinerarios sobre datos almacenados;
 - registro idempotente de actividad y cálculo de puntos, niveles, rachas y
   badges;
+- recibos de recompensa con delta de puntos y badges recién desbloqueados;
 - persistencia JSON atómica para desarrollo;
 - esquema PostgreSQL + PostGIS para producción.
 
@@ -94,10 +95,29 @@ Si `center` no se envía, la API geocodifica el destino. Si el catálogo no tien
 lugares publicados para esa ciudad, realiza una carga inicial acotada desde
 Overpass, persiste el resultado y vuelve a planificar.
 
+Ejemplo de progreso gamificado:
+
+```bash
+curl -X POST http://localhost:8080/v1/gamification/activities \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "idempotencyKey": "mobile-clave-estable",
+    "userId": "anon-instalacion",
+    "type": "place_visited",
+    "subjectId": "osm-node-123",
+    "occurredAt": "2026-07-28T15:00:00Z"
+  }'
+```
+
+Una escritura nueva responde `201`; un reintento de la misma actividad responde
+`200`, `recorded: false` y `awardedPoints: 0`.
+
 ## Límites conscientes del MVP
 
 - El adaptador JSON es para desarrollo y una sola instancia.
 - No hay autenticación de usuarios todavía; solo protección administrativa.
+- El identificador de jugador enviado por Android es pseudónimo y no prueba
+  identidad.
 - La verificación antifraude para visitas necesita señales del dispositivo y
   reglas de privacidad.
 - La planificación usa distancia geodésica, no rutas por calle.

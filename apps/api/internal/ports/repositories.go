@@ -20,7 +20,7 @@ type CatalogQueryRepository interface {
 }
 
 type GamificationCommandRepository interface {
-	RecordActivity(context.Context, domain.Activity) (domain.PlayerProfile, bool, error)
+	RecordActivity(context.Context, domain.Activity) (domain.ActivityReward, error)
 }
 
 type GamificationQueryRepository interface {

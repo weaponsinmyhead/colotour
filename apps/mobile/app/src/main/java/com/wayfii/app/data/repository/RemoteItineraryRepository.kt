@@ -137,6 +137,7 @@ private data class MoneyDto(
 @Serializable
 private data class ItineraryStopDto(
     val order: Int,
+    val placeId: String,
     val type: String,
     val title: String,
     val summary: String,
@@ -195,6 +196,7 @@ private data class PlannedItineraryDto(
                         longitud = stop.location.longitude,
                         reason = stop.reason,
                         imageUrl = stop.imageUrl?.takeIf(String::isNotBlank),
+                        placeId = stop.placeId.takeIf(String::isNotBlank),
                     ),
                 )
             }

@@ -11,14 +11,24 @@ Repository Pattern.
 - mapa OpenStreetMap con OSMDroid;
 - enriquecimiento visual con Wikimedia y Coil;
 - propuestas visuales de aventura y selección de recorrido;
-- progreso de Main Quest, Side Quests y finalización local;
+- progreso de Main Quest y Side Quests;
+- puntos, nivel, racha y badges con persistencia offline-first;
+- sincronización idempotente de visitas y recorridos completados;
 - ViewModels para preferencias e itinerarios.
 
 `RemoteItineraryRepository` consume la API como fuente primaria y
 `ResilientItineraryRepository` activa el motor local si la API no responde. Las
 nuevas reglas compartidas, el catálogo, los eventos y la gamificación
 verificable deben evolucionar en `../api`, no duplicarse en Compose. El progreso
-visual actual todavía es estado local de la sesión.
+se recompensa primero en el dispositivo y queda en una cola local si la API no
+está disponible. Cuando vuelve la conexión, se sincroniza con la misma clave de
+idempotencia para no duplicar puntos.
+
+Hasta incorporar autenticación, el viajero usa un identificador pseudónimo
+persistente por instalación. Completar una parada es irreversible para esa
+jornada: otorga 20 puntos por lugar, 30 por evento y 40 adicionales al terminar
+el recorrido. Las Side Quests actuales son propuestas visuales y no otorgan
+puntos hasta provenir del catálogo verificable.
 
 En debug, el emulador apunta a `http://10.0.2.2:8080`. Puede sobrescribirse:
 

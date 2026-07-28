@@ -223,9 +223,9 @@ func (store *JSONStore) SearchEvents(
 func (store *JSONStore) RecordActivity(
 	ctx context.Context,
 	activity domain.Activity,
-) (domain.PlayerProfile, bool, error) {
+) (domain.ActivityReward, error) {
 	if err := ctx.Err(); err != nil {
-		return domain.PlayerProfile{}, false, err
+		return domain.ActivityReward{}, err
 	}
 
 	store.mu.Lock()
@@ -235,11 +235,16 @@ func (store *JSONStore) RecordActivity(
 		if existing.UserID != activity.UserID ||
 			existing.Type != activity.Type ||
 			existing.SubjectID != activity.SubjectID {
-			return domain.PlayerProfile{}, false, errors.New(
+			return domain.ActivityReward{}, errors.New(
 				"idempotency key was already used for a different activity",
 			)
 		}
-		return store.state.Players[existing.UserID], false, nil
+		return domain.ActivityReward{
+			Recorded:      false,
+			AwardedPoints: 0,
+			EarnedBadges:  []string{},
+			Profile:       clonePlayer(store.state.Players[existing.UserID]),
+		}, nil
 	}
 
 	profile, profileExisted := store.state.Players[activity.UserID]
@@ -251,6 +256,7 @@ func (store *JSONStore) RecordActivity(
 		}
 	}
 	previousProfile := profile
+	previousBadges := append([]string(nil), profile.Badges...)
 	profile.Points += activity.Points
 	profile.Level = profile.Points/250 + 1
 	profile.CurrentStreak = nextStreak(profile.LastActivityAt, activity.OccurredAt, profile.CurrentStreak)
@@ -270,9 +276,14 @@ func (store *JSONStore) RecordActivity(
 		} else {
 			store.state.Players[activity.UserID] = previousProfile
 		}
-		return domain.PlayerProfile{}, false, err
+		return domain.ActivityReward{}, err
 	}
-	return clonePlayer(profile), true, nil
+	return domain.ActivityReward{
+		Recorded:      true,
+		AwardedPoints: activity.Points,
+		EarnedBadges:  newBadges(previousBadges, profile.Badges),
+		Profile:       clonePlayer(profile),
+	}, nil
 }
 
 func (store *JSONStore) GetPlayer(
@@ -422,6 +433,20 @@ func earnedBadges(
 		badges = append(badges, "racha_7_dias")
 	}
 	return badges
+}
+
+func newBadges(previous, current []string) []string {
+	existing := make(map[string]struct{}, len(previous))
+	for _, badge := range previous {
+		existing[badge] = struct{}{}
+	}
+	result := make([]string, 0, len(current))
+	for _, badge := range current {
+		if _, found := existing[badge]; !found {
+			result = append(result, badge)
+		}
+	}
+	return result
 }
 
 func clonePlace(place domain.Place) domain.Place {

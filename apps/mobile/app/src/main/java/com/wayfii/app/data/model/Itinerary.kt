@@ -38,7 +38,10 @@ data class ItineraryStop(
     val latitud: Double? = null,
     val longitud: Double? = null,
     val reason: String = "",
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    // Stable catalog identifier returned by the Wayfii API. Local fallback
+    // itineraries may not have one, so gamification derives a safe local key.
+    val placeId: String? = null
 )
 
 @Serializable

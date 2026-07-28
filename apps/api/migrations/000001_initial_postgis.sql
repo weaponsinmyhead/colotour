@@ -81,12 +81,22 @@ CREATE TABLE gamification_activities (
     idempotency_key TEXT NOT NULL UNIQUE,
     user_id TEXT NOT NULL,
     activity_type TEXT NOT NULL,
-    subject_id TEXT,
+    subject_id TEXT NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     occurred_at TIMESTAMPTZ NOT NULL,
     recorded_at TIMESTAMPTZ NOT NULL,
     points INTEGER NOT NULL,
-    CONSTRAINT gamification_points_non_negative CHECK (points >= 0)
+    CONSTRAINT gamification_points_non_negative CHECK (points >= 0),
+    CONSTRAINT gamification_activity_type_valid CHECK (
+        activity_type IN (
+            'place_visited',
+            'event_attended',
+            'itinerary_completed',
+            'place_contributed',
+            'place_validated',
+            'offer_redeemed'
+        )
+    )
 );
 
 CREATE INDEX gamification_activities_user_date_idx

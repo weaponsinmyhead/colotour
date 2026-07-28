@@ -477,10 +477,16 @@ components:
         dataSourceSummary: {type: string}
     Activity:
       type: object
-      required: [idempotencyKey, userId, type, occurredAt]
+      required: [idempotencyKey, userId, type, subjectId, occurredAt]
       properties:
-        idempotencyKey: {type: string}
-        userId: {type: string}
+        idempotencyKey:
+          type: string
+          maxLength: 160
+          description: Clave estable y única por usuario, sujeto y acción.
+        userId:
+          type: string
+          maxLength: 160
+          description: Identificador pseudónimo del viajero; será reemplazado por el sujeto autenticado.
         type:
           type: string
           enum:
@@ -490,9 +496,13 @@ components:
             - place_contributed
             - place_validated
             - offer_redeemed
-        subjectId: {type: string}
+        subjectId:
+          type: string
+          maxLength: 160
+          description: Lugar, evento, itinerario, contribución u oferta asociada.
         metadata:
           type: object
+          maxProperties: 16
           additionalProperties: {type: string}
         occurredAt: {type: string, format: date-time}
     PlayerProfile:
@@ -510,7 +520,15 @@ components:
         updatedAt: {type: string, format: date-time}
     RecordActivityResult:
       type: object
-      required: [recorded, profile]
+      required: [recorded, awardedPoints, earnedBadges, profile]
       properties:
         recorded: {type: boolean}
+        awardedPoints:
+          type: integer
+          minimum: 0
+          description: Delta otorgado por esta escritura; es cero en reintentos idempotentes.
+        earnedBadges:
+          type: array
+          description: Badges desbloqueados por esta actividad.
+          items: {type: string}
         profile: {$ref: "#/components/schemas/PlayerProfile"}

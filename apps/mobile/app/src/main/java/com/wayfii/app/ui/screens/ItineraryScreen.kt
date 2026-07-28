@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.wayfii.app.data.model.*
 import com.wayfii.app.ui.components.*
 import com.wayfii.app.ui.viewmodel.ItineraryUiState
+import com.wayfii.app.ui.viewmodel.RewardFeedback
 
 private val ScreenBg = Color(0xFFF8F9FA)
 private val CardBg = Color.White
@@ -45,7 +46,7 @@ fun ItineraryScreen(
     onSelectProposal: (AdventureProposal) -> Unit = {},
     onToggleStop: (Int) -> Unit = {},
     onToggleSideQuest: (String) -> Unit = {},
-    onFinishAdventure: () -> Unit = {},
+    onRewardShown: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -90,10 +91,14 @@ fun ItineraryScreen(
                     proposal = uiState.selectedProposal,
                     completedStopOrders = uiState.completedStopOrders,
                     discoveredSideQuestIds = uiState.discoveredSideQuestIds,
+                    playerProgress = uiState.playerProgress,
+                    isProgressLoading = uiState.isProgressLoading,
                     isFinished = uiState.isFinished,
+                    rewardFeedback = uiState.rewardFeedback,
+                    progressError = uiState.progressError,
                     onToggleStop = onToggleStop,
                     onToggleSideQuest = onToggleSideQuest,
-                    onFinishAdventure = onFinishAdventure,
+                    onRewardShown = onRewardShown,
                     onBack = onBack
                 )
             }
@@ -106,14 +111,19 @@ fun ActiveAdventureQuestView(
     proposal: AdventureProposal,
     completedStopOrders: Set<Int>,
     discoveredSideQuestIds: Set<String>,
+    playerProgress: PlayerProgress,
+    isProgressLoading: Boolean,
     isFinished: Boolean,
+    rewardFeedback: RewardFeedback?,
+    progressError: String?,
     onToggleStop: (Int) -> Unit,
     onToggleSideQuest: (String) -> Unit,
-    onFinishAdventure: () -> Unit,
+    onRewardShown: () -> Unit,
     onBack: () -> Unit
 ) {
     var selectedStopOrder by remember { mutableStateOf<Int?>(proposal.mainQuestStops.firstOrNull()?.order) }
     val carouselState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val totalMainStops = proposal.mainQuestStops.size
     val completedCount = proposal.mainQuestStops.count { completedStopOrders.contains(it.order) }
@@ -126,6 +136,14 @@ fun ActiveAdventureQuestView(
             if (index != -1) {
                 carouselState.animateScrollToItem(index)
             }
+        }
+    }
+
+    LaunchedEffect(rewardFeedback?.id, isFinished) {
+        val feedback = rewardFeedback
+        if (feedback != null && !isFinished) {
+            snackbarHostState.showSnackbar(feedback.message)
+            onRewardShown()
         }
     }
 
@@ -147,6 +165,8 @@ fun ActiveAdventureQuestView(
             completedCount = completedCount,
             totalMainStops = totalMainStops,
             progressPercent = progressPercent,
+            playerProgress = playerProgress,
+            isProgressLoading = isProgressLoading,
             onBack = onBack,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -158,7 +178,7 @@ fun ActiveAdventureQuestView(
         Surface(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = 135.dp, start = 16.dp),
+                .padding(top = 170.dp, start = 16.dp),
             shape = RoundedCornerShape(14.dp),
             color = CardBg.copy(alpha = 0.95f),
             border = BorderStroke(1.dp, BorderCol),
@@ -206,12 +226,23 @@ fun ActiveAdventureQuestView(
             }
         }
 
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 188.dp),
+        )
+
         // 5. Celebration Dialog Overlay
         if (isFinished) {
             CelebrationOverlay(
                 proposal = proposal,
                 completedCount = completedCount,
                 discoveredSideQuestsCount = discoveredSideQuestIds.size,
+                playerProgress = playerProgress,
+                rewardFeedback = rewardFeedback,
+                progressError = progressError,
                 onDismiss = onBack
             )
         }
@@ -224,6 +255,8 @@ private fun FloatingQuestHeader(
     completedCount: Int,
     totalMainStops: Int,
     progressPercent: Int,
+    playerProgress: PlayerProgress,
+    isProgressLoading: Boolean,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -286,7 +319,13 @@ private fun FloatingQuestHeader(
 
             // Progress Bar
             LinearProgressIndicator(
-                progress = { (completedCount.toFloat() / totalMainStops).coerceIn(0f, 1f) },
+                progress = {
+                    if (totalMainStops == 0) {
+                        0f
+                    } else {
+                        (completedCount.toFloat() / totalMainStops).coerceIn(0f, 1f)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
@@ -294,7 +333,55 @@ private fun FloatingQuestHeader(
                 color = TealAccent,
                 trackColor = Color(0xFFE2E8F0)
             )
+
+            PlayerProgressSummary(
+                progress = playerProgress,
+                isLoading = isProgressLoading,
+            )
         }
+    }
+}
+
+@Composable
+private fun PlayerProgressSummary(
+    progress: PlayerProgress,
+    isLoading: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ProgressMetric(text = "Nivel ${progress.level}")
+        ProgressMetric(text = "${progress.points} pts")
+        ProgressMetric(text = "🔥 ${progress.currentStreak}")
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = if (isLoading) "Cargando..." else progress.syncStatus.shortLabel(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = when (progress.syncStatus) {
+                GamificationSyncStatus.SYNCED -> TealAccent
+                GamificationSyncStatus.PENDING -> CoralAccent
+                GamificationSyncStatus.LOCAL_ONLY -> TextMuted
+            },
+        )
+    }
+}
+
+@Composable
+private fun ProgressMetric(text: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFFF1F5F9),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = TextDark,
+        )
     }
 }
 
@@ -374,13 +461,16 @@ private fun QuestStopCard(
             // Complete button
             Button(
                 onClick = onToggleComplete,
+                enabled = !isCompleted,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(36.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isCompleted) Color(0xFF22C55E) else TealAccent,
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFF22C55E),
+                    disabledContentColor = Color.White,
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
@@ -399,6 +489,9 @@ private fun CelebrationOverlay(
     proposal: AdventureProposal,
     completedCount: Int,
     discoveredSideQuestsCount: Int,
+    playerProgress: PlayerProgress,
+    rewardFeedback: RewardFeedback?,
+    progressError: String?,
     onDismiss: () -> Unit
 ) {
     Box(
@@ -429,7 +522,52 @@ private fun CelebrationOverlay(
                 Text(
                     text = "Completaste exitosamente ${proposal.title}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextMuted
+                    color = TextMuted,
+                )
+
+                if ((rewardFeedback?.awardedPoints ?: 0) > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = CoralAccent.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            text = "+${rewardFeedback?.awardedPoints} puntos",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = CoralAccent,
+                        )
+                    }
+                }
+
+                rewardFeedback?.earnedBadges?.firstOrNull()?.let { badge ->
+                    Text(
+                        text = "🏅 Nuevo logro: ${badge.displayName()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TealAccent,
+                    )
+                }
+
+                if (progressError != null) {
+                    Text(
+                        text = progressError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CoralAccent,
+                    )
+                } else {
+                    Text(
+                        text = playerProgress.syncStatus.longLabel(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted,
+                    )
+                }
+
+                Text(
+                    text = "$completedCount/${proposal.mainQuestStops.size} paradas · " +
+                        "$discoveredSideQuestsCount Side Quests · ${proposal.distanceText}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextMuted,
                 )
 
                 HorizontalDivider(color = BorderCol)
@@ -438,9 +576,9 @@ private fun CelebrationOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    CelebrationStatItem(label = "Distancia", value = proposal.distanceText)
-                    CelebrationStatItem(label = "Main Quest", value = "$completedCount/${proposal.mainQuestStops.size}")
-                    CelebrationStatItem(label = "Side Quests", value = "$discoveredSideQuestsCount")
+                    CelebrationStatItem(label = "Nivel", value = "${playerProgress.level}")
+                    CelebrationStatItem(label = "Puntos", value = "${playerProgress.points}")
+                    CelebrationStatItem(label = "Racha", value = "🔥 ${playerProgress.currentStreak}")
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -466,4 +604,26 @@ private fun CelebrationStatItem(label: String, value: String) {
         Text(text = value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = TealAccent)
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
     }
+}
+
+private fun GamificationSyncStatus.shortLabel(): String = when (this) {
+    GamificationSyncStatus.SYNCED -> "En línea"
+    GamificationSyncStatus.PENDING -> "Pendiente"
+    GamificationSyncStatus.LOCAL_ONLY -> "Local"
+}
+
+private fun GamificationSyncStatus.longLabel(): String = when (this) {
+    GamificationSyncStatus.SYNCED -> "Progreso sincronizado con Wayfii."
+    GamificationSyncStatus.PENDING ->
+        "Guardado en el teléfono. Se sincronizará cuando vuelva la conexión."
+    GamificationSyncStatus.LOCAL_ONLY -> "Progreso guardado en este dispositivo."
+}
+
+private fun String.displayName(): String = when (this) {
+    "primer_paso" -> "Primer paso"
+    "explorador_local" -> "Explorador local"
+    "agenda_viva" -> "Agenda viva"
+    "curador_comunitario" -> "Curador comunitario"
+    "racha_7_dias" -> "Racha de 7 días"
+    else -> replace('_', ' ').replaceFirstChar(Char::uppercase)
 }

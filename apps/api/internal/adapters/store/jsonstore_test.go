@@ -76,15 +76,25 @@ func TestRecordActivityIsIdempotent(t *testing.T) {
 		Points:         20,
 	}
 
-	first, created, err := repository.RecordActivity(context.Background(), activity)
-	if err != nil || !created {
-		t.Fatalf("first RecordActivity() profile=%#v created=%v error=%v", first, created, err)
+	first, err := repository.RecordActivity(context.Background(), activity)
+	if err != nil || !first.Recorded {
+		t.Fatalf("first RecordActivity() reward=%#v error=%v", first, err)
 	}
-	second, created, err := repository.RecordActivity(context.Background(), activity)
-	if err != nil || created {
-		t.Fatalf("second RecordActivity() profile=%#v created=%v error=%v", second, created, err)
+	if first.AwardedPoints != 20 {
+		t.Fatalf("first awarded points = %d, want 20", first.AwardedPoints)
 	}
-	if second.Points != 20 {
-		t.Fatalf("idempotent points = %d, want 20", second.Points)
+	if len(first.EarnedBadges) != 1 || first.EarnedBadges[0] != "primer_paso" {
+		t.Fatalf("first earned badges = %#v, want primer_paso", first.EarnedBadges)
+	}
+
+	second, err := repository.RecordActivity(context.Background(), activity)
+	if err != nil || second.Recorded {
+		t.Fatalf("second RecordActivity() reward=%#v error=%v", second, err)
+	}
+	if second.AwardedPoints != 0 || len(second.EarnedBadges) != 0 {
+		t.Fatalf("duplicate reward = %#v, want no delta", second)
+	}
+	if second.Profile.Points != 20 {
+		t.Fatalf("idempotent points = %d, want 20", second.Profile.Points)
 	}
 }

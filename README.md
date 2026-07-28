@@ -17,7 +17,9 @@ docs/
 La app Android usa `POST /v1/itineraries/plan` como fuente primaria en debug y
 conserva temporalmente el motor local con Overpass/Nominatim como fallback. La
 API centraliza geocodificación, importación de OpenStreetMap, catálogo
-persistido, planificación y ledger de gamificación.
+persistido, planificación y ledger de gamificación. El progreso se acredita de
+forma offline-first en Android y se sincroniza mediante actividades
+idempotentes, sin duplicar recompensas ante reintentos.
 
 ## Desarrollo
 

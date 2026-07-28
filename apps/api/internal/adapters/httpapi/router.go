@@ -185,19 +185,16 @@ func (api *API) recordActivity(writer http.ResponseWriter, request *http.Request
 		writeError(writer, http.StatusBadRequest, err)
 		return
 	}
-	profile, recorded, err := api.dependencies.GamificationCommands.RecordActivity(request.Context(), activity)
+	reward, err := api.dependencies.GamificationCommands.RecordActivity(request.Context(), activity)
 	if err != nil {
 		writeError(writer, http.StatusBadRequest, err)
 		return
 	}
 	status := http.StatusOK
-	if recorded {
+	if reward.Recorded {
 		status = http.StatusCreated
 	}
-	writeJSON(writer, status, map[string]any{
-		"recorded": recorded,
-		"profile":  profile,
-	})
+	writeJSON(writer, status, reward)
 }
 
 func (api *API) getPlayer(writer http.ResponseWriter, request *http.Request) {
