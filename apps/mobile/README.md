@@ -10,11 +10,14 @@ Repository Pattern.
 - POI reales mediante Overpass con fallback mock;
 - mapa OpenStreetMap con OSMDroid;
 - enriquecimiento visual con Wikimedia y Coil;
+- propuestas visuales de aventura y selección de recorrido;
+- progreso de Main Quest, Side Quests y finalización local;
 - ViewModels para preferencias e itinerarios.
 
 El motor local continúa operativo como fallback mientras se estabiliza el
 contrato remoto. Las nuevas reglas compartidas, el catálogo, los eventos y la
-gamificación deben evolucionar en `../api`, no duplicarse en Compose.
+gamificación verificable deben evolucionar en `../api`, no duplicarse en
+Compose. El progreso visual actual todavía es estado local de la sesión.
 
 ## Comandos
 

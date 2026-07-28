@@ -16,6 +16,12 @@ El `origin/main` auditado contiene una aplicación Android funcional con:
 - fallback mock;
 - ViewModels y primeras iteraciones de interfaz.
 
+También se revisó `origin/adventureStyle`, un commit directo sobre ese `main`.
+La rama de plataforma incorpora su experiencia más reciente de propuestas,
+Main Quest, Side Quests y progreso visual, reubicada dentro de `apps/mobile`.
+Se excluyeron deliberadamente un log del daemon Kotlin y configuración local de
+Device Manager.
+
 El móvil resuelve todo el procesamiento y consulta proveedores públicos por
 dispositivo. Ese diseño fue útil para validar la idea, pero dificulta:
 

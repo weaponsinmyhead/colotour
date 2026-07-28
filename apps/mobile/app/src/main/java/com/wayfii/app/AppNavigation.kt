@@ -1,4 +1,4 @@
-﻿package com.wayfii.app
+package com.wayfii.app
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -20,7 +20,6 @@ import com.wayfii.app.ui.viewmodel.ItineraryViewModel
 fun MainNavigation() {
   val navController = rememberNavController()
 
-  // ViewModel compartido a nivel de navegación
   val itineraryViewModel: ItineraryViewModel = viewModel {
     ItineraryViewModel(MockItineraryRepository())
   }
@@ -32,7 +31,7 @@ fun MainNavigation() {
     composable<PreferencesRoute> {
       PreferencesScreen(
         onGenerate = { prefs ->
-          itineraryViewModel.generarItinerario(prefs)
+          itineraryViewModel.generarAventuras(prefs)
           navController.navigate(ItineraryRoute)
         },
         modifier = Modifier.safeDrawingPadding().padding(8.dp),
@@ -46,6 +45,18 @@ fun MainNavigation() {
         onBack = {
           itineraryViewModel.resetState()
           navController.popBackStack()
+        },
+        onSelectProposal = { proposal ->
+          itineraryViewModel.seleccionarAventura(proposal)
+        },
+        onToggleStop = { order ->
+          itineraryViewModel.toggleCompletarParada(order)
+        },
+        onToggleSideQuest = { id ->
+          itineraryViewModel.toggleDescubrirSideQuest(id)
+        },
+        onFinishAdventure = {
+          itineraryViewModel.finalizarAventura()
         },
         modifier = Modifier.safeDrawingPadding(),
       )

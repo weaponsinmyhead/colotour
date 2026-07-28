@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="400dp"
+    android:height="240dp"
+    android:viewportWidth="400"
+    android:viewportHeight="240">
+    <path android:pathData="M0,0h400v240h-400z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="400"
+                android:endY="240"
+                android:type="linear">
+                <item android:color="#FF3E2723" android:offset="0.0"/>
+                <item android:color="#FF5D4037" android:offset="0.5"/>
+                <item android:color="#FF4E342E" android:offset="1.0"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Coffee cup & steam accent -->
+    <path
+        android:fillColor="#22FFB74D"
+        android:pathData="M180,60 C220,100 240,160 210,210 C170,190 140,120 180,60 Z"/>
+</vector>

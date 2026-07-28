@@ -1,4 +1,4 @@
-﻿package com.wayfii.app.ui.viewmodel
+package com.wayfii.app.ui.viewmodel
 
 import com.wayfii.app.data.model.*
 import com.wayfii.app.data.repository.ItineraryRepository
@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -26,16 +27,16 @@ class ItineraryViewModelTest {
     }
 
     @Test
-    fun `generarItinerario updates uiState to Success`() = runTest {
+    fun `generarAventuras updates uiState to ProposalsLoaded`() = runTest {
         val repository = object : ItineraryRepository {
             override suspend fun generarItinerario(preferences: TravelPreferences): Result<Itinerary> {
                 return Result.success(
                     Itinerary(
-                        destino = "Test",
+                        destino = "Bariloche",
                         actividades = emptyList(),
-                        duracionTotal = "2h",
+                        duracionTotal = "3h",
                         costoTotalEstimado = "0",
-                        puntoPartida = "Test Start",
+                        puntoPartida = "Centro",
                         rangoHorarioText = "09:00 a 18:00",
                         incluyeComida = true,
                         cantidadPersonas = 1
@@ -45,20 +46,24 @@ class ItineraryViewModelTest {
         }
         val viewModel = ItineraryViewModel(repository)
         val prefs = TravelPreferences(
-            destino = "Test",
+            destino = "Bariloche",
             intereses = setOf(TourismInterest.CULTURAL),
             movilidad = setOf(MobilityType.CAMINANDO),
             startMinutes = 540,
             endMinutes = 1080,
-            startingPointName = "Test Start",
+            startingPointName = "Centro",
             includeFoodStops = true,
             cantidadPersonas = 1,
             presupuesto = BudgetLevel.BAJO,
             ritmo = TravelPace.EQUILIBRADO
         )
 
-        viewModel.generarItinerario(prefs)
+        viewModel.generarAventuras(prefs)
 
-        assertTrue(viewModel.uiState.value is ItineraryUiState.Success)
+        val state = viewModel.uiState.value
+        assertTrue(state is ItineraryUiState.ProposalsLoaded)
+        if (state is ItineraryUiState.ProposalsLoaded) {
+            assertEquals(5, state.proposals.size)
+        }
     }
 }

@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="400dp"
+    android:height="240dp"
+    android:viewportWidth="400"
+    android:viewportHeight="240">
+    <path android:pathData="M0,0h400v240h-400z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="400"
+                android:endY="240"
+                android:type="linear">
+                <item android:color="#FF1E4D2B" android:offset="0.0"/>
+                <item android:color="#FF2E7D32" android:offset="0.5"/>
+                <item android:color="#FF004D40" android:offset="1.0"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Botanical leaf path accent -->
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M200,40 C260,80 320,160 300,220 C240,200 160,120 200,40 Z"/>
+    <path
+        android:fillColor="#22FFFFFF"
+        android:pathData="M100,100 C150,130 200,190 180,240 C130,220 80,160 100,100 Z"/>
+</vector>
