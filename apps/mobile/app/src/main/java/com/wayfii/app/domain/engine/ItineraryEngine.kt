@@ -3,9 +3,8 @@
 import com.wayfii.app.data.model.*
 import com.wayfii.app.data.repository.GeocodingRepository
 import com.wayfii.app.data.repository.PlacesRepository
-import com.wayfii.app.data.repository.HybridPlacesRepository
+import com.wayfii.app.data.repository.PlacesSourceMetadata
 import java.util.Locale
-import kotlin.math.abs
 
 class ItineraryEngine(
     private val placesRepository: PlacesRepository,
@@ -18,7 +17,6 @@ class ItineraryEngine(
 
     suspend fun generate(preferences: TravelPreferences): Itinerary {
         // 1. Intentar geocodificar destino principal o usar coordenadas provistas
-        var isFallback = false
         var destLat = 0.0
         var destLon = 0.0
 
@@ -32,11 +30,10 @@ class ItineraryEngine(
                 destLat = point.latitude
                 destLon = point.longitude
             } else {
-                // Fallback en base a hash local para mantener funcionamiento sin conexión
-                isFallback = true
-                val hash = preferences.destino.lowercase().hashCode()
-                destLat = -34.6037 + (abs(hash) % 1000) * 0.0001
-                destLon = -58.3816 + ((abs(hash) / 1000) % 1000) * 0.0001
+                throw IllegalStateException(
+                    "No se pudo ubicar el destino con datos geográficos reales.",
+                    destResult.exceptionOrNull(),
+                )
             }
         }
 
@@ -181,7 +178,8 @@ class ItineraryEngine(
         val rangoHorarioText = String.format(Locale.getDefault(), "%02d:%02d a %02d:%02d", startHour, startMin, endHour, endMin)
         val duracionTotalString = "${(preferences.endMinutes - preferences.startMinutes) / 60} horas disponibles"
 
-        val sourceSummary = (placesRepository as? HybridPlacesRepository)?.lastSourceSummary ?: "Sugerencias simuladas"
+        val sourceSummary = (placesRepository as? PlacesSourceMetadata)?.sourceSummary
+            ?: "Catálogo real de Wayfii"
 
         return Itinerary(
             destino = preferences.destino.trim(),
@@ -192,7 +190,7 @@ class ItineraryEngine(
             rangoHorarioText = rangoHorarioText,
             incluyeComida = preferences.includeFoodStops,
             cantidadPersonas = preferences.cantidadPersonas,
-            isFallbackCoordinates = isFallback,
+            isFallbackCoordinates = false,
             dataSourceSummary = sourceSummary
         )
     }

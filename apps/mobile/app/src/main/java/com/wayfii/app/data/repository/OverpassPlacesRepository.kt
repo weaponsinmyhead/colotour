@@ -3,6 +3,7 @@
 import com.wayfii.app.data.model.BudgetLevel
 import com.wayfii.app.data.model.TourismInterest
 import com.wayfii.app.domain.engine.CandidatePlace
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -42,7 +43,7 @@ open class OverpassPlacesRepository(
               node["leisure"~"park|nature_reserve"](around:3000,$baseLat,$baseLon);
               node["natural"~"beach"](around:3000,$baseLat,$baseLon);
               node["amenity"~"restaurant|cafe|theatre|marketplace"](around:3000,$baseLat,$baseLon);
-              node["shop"](around:3000,$baseLat,$baseLon);
+              node["shop"~"mall|department_store|gift|craft|antiques|books|jewelry"](around:3000,$baseLat,$baseLon);
             );
             out body;
         """.trimIndent()
@@ -55,7 +56,7 @@ open class OverpassPlacesRepository(
             val request = Request.Builder()
                 .url("https://overpass-api.de/api/interpreter")
                 .post(body)
-                .header("User-Agent", "WayfiiApp/1.0 (milla.developer@example.com)")
+                .header("User-Agent", WAYFII_OPEN_DATA_USER_AGENT)
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -68,6 +69,8 @@ open class OverpassPlacesRepository(
                 
                 val places = overpassRes.elements
                     .filter { !it.tags["name"].isNullOrBlank() } // Se descartan nodos sin nombre
+                    // Evita que una zona urbana muy densa crezca sin límite.
+                    .take(500)
                     .map { elem ->
                         mapElementToCandidate(elem)
                     }
@@ -75,6 +78,8 @@ open class OverpassPlacesRepository(
                 cache[cacheKey] = places
                 Result.success(places)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

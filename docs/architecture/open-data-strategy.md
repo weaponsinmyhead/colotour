@@ -16,6 +16,11 @@ Wayfii, sin abusar de infraestructura comunitaria gratuita.
 | Imágenes | Wikimedia con fallback | Media curada/licenciada y CDN |
 | Eventos | Alta curada + fuentes abiertas/aliados | Conectores por municipio, ticketera o partner |
 
+La primera implementación operativa agrega un worker secuencial con Overpass
+para lugares y un adaptador opcional de Ticketmaster Discovery para eventos. La
+evaluación completa, incluyendo fuentes descartadas o diferidas, está en
+[`catalog-source-research.md`](catalog-source-research.md).
+
 ## Principio operativo
 
 Overpass no debe consultarse por cada usuario. Ante el primer itinerario de un

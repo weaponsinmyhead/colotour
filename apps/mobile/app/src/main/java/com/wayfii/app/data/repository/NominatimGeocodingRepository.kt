@@ -1,8 +1,12 @@
 ﻿package com.wayfii.app.data.repository
 
 import com.wayfii.app.data.model.GeoPoint
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -13,6 +17,10 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+
+private const val NOMINATIM_MIN_INTERVAL_NANOS = 1_000_000_000L
+private val nominatimRequestMutex = Mutex()
+private var lastNominatimRequestNanos = 0L
 
 class NominatimGeocodingRepository : GeocodingRepository {
 
@@ -43,33 +51,43 @@ class NominatimGeocodingRepository : GeocodingRepository {
             val request = Request.Builder()
                 .url(url)
                 // Se incluye un agente descriptivo para evitar bloqueos del servidor OSM
-                .header("User-Agent", "WayfiiApp/1.0 (milla.developer@example.com)")
+                .header("User-Agent", WAYFII_OPEN_DATA_USER_AGENT)
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(IOException("Error HTTP: ${response.code}"))
-                }
+            withNominatimRateLimit {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        return@withNominatimRateLimit Result.failure(
+                            IOException("Error HTTP: ${response.code}"),
+                        )
+                    }
 
-                val bodyString = response.body?.string() ?: ""
-                val jsonArray = jsonParser.parseToJsonElement(bodyString).jsonArray
+                    val bodyString = response.body?.string() ?: ""
+                    val jsonArray = jsonParser.parseToJsonElement(bodyString).jsonArray
 
-                if (jsonArray.isEmpty()) {
-                    return@withContext Result.failure(NoSuchElementException("Sin resultados para la consulta."))
-                }
+                    if (jsonArray.isEmpty()) {
+                        return@withNominatimRateLimit Result.failure(
+                            NoSuchElementException("Sin resultados para la consulta."),
+                        )
+                    }
 
-                val firstResult = jsonArray[0].jsonObject
-                val lat = firstResult["lat"]?.jsonPrimitive?.content?.toDoubleOrNull()
-                val lon = firstResult["lon"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                    val firstResult = jsonArray[0].jsonObject
+                    val lat = firstResult["lat"]?.jsonPrimitive?.content?.toDoubleOrNull()
+                    val lon = firstResult["lon"]?.jsonPrimitive?.content?.toDoubleOrNull()
 
-                if (lat != null && lon != null) {
-                    val geoPoint = GeoPoint(lat, lon)
-                    cache[cleanQuery] = geoPoint
-                    Result.success(geoPoint)
-                } else {
-                    Result.failure(IllegalStateException("Coordenadas nulas o formato erróneo."))
+                    if (lat != null && lon != null) {
+                        val geoPoint = GeoPoint(lat, lon)
+                        cache[cleanQuery] = geoPoint
+                        Result.success(geoPoint)
+                    } else {
+                        Result.failure(
+                            IllegalStateException("Coordenadas nulas o formato erróneo."),
+                        )
+                    }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -86,33 +104,54 @@ class NominatimGeocodingRepository : GeocodingRepository {
 
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "WayfiiApp/1.0 (milla.developer@example.com)")
+                .header("User-Agent", WAYFII_OPEN_DATA_USER_AGENT)
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(IOException("Error HTTP: ${response.code}"))
-                }
+            withNominatimRateLimit {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        return@withNominatimRateLimit Result.failure(
+                            IOException("Error HTTP: ${response.code}"),
+                        )
+                    }
 
-                val bodyString = response.body?.string() ?: ""
-                val jsonObject = jsonParser.parseToJsonElement(bodyString).jsonObject
-                
-                // Intentar extraer una descripción legible: city, town, village o el display_name completo
-                val address = jsonObject["address"]?.jsonObject
-                val city = address?.get("city")?.jsonPrimitive?.content
-                    ?: address?.get("town")?.jsonPrimitive?.content
-                    ?: address?.get("village")?.jsonPrimitive?.content
-                    ?: address?.get("suburb")?.jsonPrimitive?.content
-                
-                val displayName = jsonObject["display_name"]?.jsonPrimitive?.content ?: "Ubicación actual"
-                
-                val finalName = city ?: displayName.split(",").firstOrNull() ?: "Ubicación actual"
-                
-                reverseCache[cacheKey] = finalName
-                Result.success(finalName)
+                    val bodyString = response.body?.string() ?: ""
+                    val jsonObject = jsonParser.parseToJsonElement(bodyString).jsonObject
+
+                    // Intentar extraer una descripción legible: city, town, village o el display_name completo
+                    val address = jsonObject["address"]?.jsonObject
+                    val city = address?.get("city")?.jsonPrimitive?.content
+                        ?: address?.get("town")?.jsonPrimitive?.content
+                        ?: address?.get("village")?.jsonPrimitive?.content
+                        ?: address?.get("suburb")?.jsonPrimitive?.content
+
+                    val displayName = jsonObject["display_name"]?.jsonPrimitive?.content
+                        ?: "Ubicación actual"
+                    val finalName = city
+                        ?: displayName.split(",").firstOrNull()
+                        ?: "Ubicación actual"
+
+                    reverseCache[cacheKey] = finalName
+                    Result.success(finalName)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 }
+
+private suspend fun <T> withNominatimRateLimit(block: () -> T): T =
+    nominatimRequestMutex.withLock {
+        val elapsed = System.nanoTime() - lastNominatimRequestNanos
+        val waitNanos = NOMINATIM_MIN_INTERVAL_NANOS - elapsed
+        if (lastNominatimRequestNanos != 0L && waitNanos > 0) {
+            delay((waitNanos + 999_999L) / 1_000_000L)
+        }
+        // El intervalo se mide entre inicios y el mutex conserva una sola
+        // solicitud en vuelo, tal como requiere el servicio público.
+        lastNominatimRequestNanos = System.nanoTime()
+        block()
+    }

@@ -1,5 +1,6 @@
 ﻿package com.wayfii.app.data.repository
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -38,7 +39,7 @@ open class WikimediaPlaceImageRepository(
 
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "WayfiiApp/1.0 (milla.developer@example.com)")
+                .header("User-Agent", WAYFII_OPEN_DATA_USER_AGENT)
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -62,6 +63,8 @@ open class WikimediaPlaceImageRepository(
                 cache[cleanQuery] = imageUrl
                 Result.success(imageUrl)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -1,11 +1,8 @@
 openapi: 3.0.0
 info:
   title: Wayfii API
-  version: 0.1.0
+  version: 0.2.0
   description: Catálogo turístico, planificación y gamificación de Wayfii.
-  license:
-    name: Proprietary
-    identifier: LicenseRef-Proprietary
 servers:
   - url: /
     description: Mismo origen que el cliente
@@ -15,6 +12,8 @@ tags:
     description: Estado operativo del servicio.
   - name: Catalog
     description: Lugares, espectáculos e importación de datos.
+  - name: Workers
+    description: Ingesta asíncrona desde proveedores turísticos reales.
   - name: Itineraries
     description: Planificación de recorridos.
   - name: Gamification
@@ -34,9 +33,11 @@ paths:
                 type: object
                 required: [status, service, time]
                 properties:
-                  status: {type: string, const: ok}
-                  service: {type: string, const: wayfii-api}
+                  status: {type: string, enum: [ok]}
+                  service: {type: string, enum: [wayfii-api]}
                   time: {type: string, format: date-time}
+        "405":
+          description: Método no permitido
   /v1/catalog/places:
     get:
       summary: Buscar lugares publicados
@@ -169,6 +170,83 @@ paths:
         "401": {$ref: "#/components/responses/Unauthorized"}
         "502":
           description: Proveedor OSM no disponible
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/workers/catalog/jobs:
+    post:
+      summary: Encolar una sincronización del catálogo
+      description: |
+        Inicia una ejecución asíncrona y secuencial contra las fuentes
+        configuradas. Si ya existe un job activo equivalente, devuelve ese
+        mismo job y agrega `X-Wayfii-Job-Reused: true`.
+      tags: [Workers]
+      operationId: enqueueCatalogSync
+      security: [{AdminBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CatalogSyncRequest"}
+            example:
+              destination: Buenos Aires
+              center:
+                latitude: -34.6037
+                longitude: -58.3816
+              countryCode: AR
+              radiusMeters: 5000
+              sources: [openstreetmap, ticketmaster]
+              eventWindowDays: 30
+      responses:
+        "202":
+          description: Job aceptado o ejecución activa equivalente reutilizada
+          headers:
+            Location:
+              description: Recurso para consultar el estado del job.
+              schema: {type: string}
+            X-Wayfii-Job-Reused:
+              description: Presente y verdadero cuando no se creó un job nuevo.
+              schema: {type: boolean}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CatalogSyncJob"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429":
+          description: La cola acotada del worker está completa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "503":
+          description: Worker no disponible
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/workers/catalog/jobs/{jobID}:
+    get:
+      summary: Consultar una sincronización del catálogo
+      tags: [Workers]
+      operationId: getCatalogSyncJob
+      security: [{AdminBearer: []}]
+      parameters:
+        - name: jobID
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Estado actual o resultado final del job
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CatalogSyncJob"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404":
+          description: Job inexistente o removido del historial acotado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "503":
+          description: Worker no disponible
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -394,6 +472,78 @@ components:
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
         version: {type: integer, minimum: 1}
+    CatalogSource:
+      type: string
+      enum: [openstreetmap, ticketmaster]
+    CatalogSyncStatus:
+      type: string
+      enum: [queued, running, succeeded, partial, failed, cancelled]
+    CatalogSyncTrigger:
+      type: string
+      enum: [api, config]
+    CatalogSyncRequest:
+      type: object
+      required: [destination]
+      properties:
+        destination:
+          type: string
+          minLength: 1
+          description: Nombre normalizado de la ciudad o destino.
+        center:
+          allOf:
+            - {$ref: "#/components/schemas/GeoPoint"}
+          description: |
+            Centro de búsqueda. Si se omite en una llamada manual, Wayfii usa
+            Nominatim. Es obligatorio para ejecuciones configuradas.
+        countryCode:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Código ISO 3166-1 alpha-2 usado para acotar eventos.
+        radiusMeters:
+          type: integer
+          minimum: 100
+          maximum: 20000
+          default: 5000
+        sources:
+          type: array
+          uniqueItems: true
+          description: |
+            Fuentes a consultar. Si se omite, se usan todas las fuentes
+            configuradas en el runtime.
+          items: {$ref: "#/components/schemas/CatalogSource"}
+        eventWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 90
+          default: 30
+    CatalogSourceSyncResult:
+      type: object
+      required: [source, kind, fetched, upserted, rejected]
+      properties:
+        source: {$ref: "#/components/schemas/CatalogSource"}
+        kind:
+          type: string
+          enum: [places, events]
+        fetched: {type: integer, minimum: 0}
+        upserted: {type: integer, minimum: 0}
+        rejected: {type: integer, minimum: 0}
+        error: {type: string}
+    CatalogSyncJob:
+      type: object
+      required: [id, status, trigger, request, results, createdAt]
+      properties:
+        id: {type: string}
+        status: {$ref: "#/components/schemas/CatalogSyncStatus"}
+        trigger: {$ref: "#/components/schemas/CatalogSyncTrigger"}
+        request: {$ref: "#/components/schemas/CatalogSyncRequest"}
+        results:
+          type: array
+          items: {$ref: "#/components/schemas/CatalogSourceSyncResult"}
+        error: {type: string}
+        createdAt: {type: string, format: date-time}
+        startedAt: {type: string, format: date-time}
+        completedAt: {type: string, format: date-time}
     PlanItineraryRequest:
       type: object
       required:

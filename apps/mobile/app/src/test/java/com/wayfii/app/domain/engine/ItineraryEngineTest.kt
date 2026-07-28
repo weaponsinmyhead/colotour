@@ -259,7 +259,7 @@ class ItineraryEngineTest {
     }
 
     @Test
-    fun `test destino no encontrado usa fallback local`() = runTest {
+    fun `test destino no encontrado no inventa coordenadas`() = runTest {
         val prefs = TravelPreferences(
             destino = "Ciudad Inexistente",
             intereses = setOf(TourismInterest.CULTURAL),
@@ -273,11 +273,13 @@ class ItineraryEngineTest {
             ritmo = TravelPace.EQUILIBRADO
         )
 
-        val result = engine.generate(prefs)
-        assertTrue(result.isFallbackCoordinates)
-        // Las actividades deberían posicionarse igual usando el fallback por hash
-        val startStop = result.actividades.first { it.type == StopType.START }
-        assertTrue(startStop.latitud != 0.0 && startStop.longitud != 0.0)
+        val result = runCatching { engine.generate(prefs) }
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            result.exceptionOrNull()?.message
+                ?.contains("datos geográficos reales") == true,
+        )
     }
 
     @Test

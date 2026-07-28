@@ -13,7 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.wayfii.app.data.repository.OfflineFirstGamificationRepository
-import com.wayfii.app.data.repository.MockItineraryRepository
+import com.wayfii.app.data.repository.OpenDataItineraryRepository
 import com.wayfii.app.data.repository.RemoteGamificationDataSource
 import com.wayfii.app.data.repository.RemoteItineraryRepository
 import com.wayfii.app.data.repository.ResilientItineraryRepository
@@ -28,7 +28,7 @@ fun MainNavigation() {
   val applicationContext = LocalContext.current.applicationContext
 
   val itineraryViewModel: ItineraryViewModel = viewModel {
-    val localRepository = MockItineraryRepository()
+    val localRepository = OpenDataItineraryRepository()
     val apiBaseUrl = BuildConfig.WAYFII_API_BASE_URL.takeIf(String::isNotBlank)
     val remoteRepository = apiBaseUrl?.let(::RemoteItineraryRepository)
     val gamificationRepository = OfflineFirstGamificationRepository(

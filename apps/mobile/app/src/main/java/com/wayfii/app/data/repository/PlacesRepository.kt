@@ -5,3 +5,7 @@ import com.wayfii.app.domain.engine.CandidatePlace
 interface PlacesRepository {
     suspend fun getCandidatePlaces(destino: String, baseLat: Double, baseLon: Double): List<CandidatePlace>
 }
+
+interface PlacesSourceMetadata {
+    val sourceSummary: String
+}

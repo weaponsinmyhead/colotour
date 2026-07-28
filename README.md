@@ -21,6 +21,11 @@ persistido, planificación y ledger de gamificación. El progreso se acredita de
 forma offline-first en Android y se sincroniza mediante actividades
 idempotentes, sin duplicar recompensas ante reintentos.
 
+La API también incorpora un worker de catálogo activable mediante endpoint o
+configuración. Importa POI reales de OpenStreetMap y, cuando se configura una
+API key, espectáculos reales de Ticketmaster, conservando procedencia,
+atribución y resultados por ejecución.
+
 ## Desarrollo
 
 ### Mobile
@@ -62,5 +67,6 @@ bash ./gradlew assembleDebug -PWAYFII_API_BASE_URL=https://api.example.com
 
 - [Fundación de arquitectura](docs/architecture/0001-platform-foundation.md)
 - [Estrategia de mapas y fuentes abiertas](docs/architecture/open-data-strategy.md)
+- [Investigación de fuentes del catálogo](docs/architecture/catalog-source-research.md)
 - [Gamificación y modelo sustentable](docs/product/gamification-and-sustainability.md)
 - [Contrato OpenAPI](apps/api/openapi/openapi.yaml)

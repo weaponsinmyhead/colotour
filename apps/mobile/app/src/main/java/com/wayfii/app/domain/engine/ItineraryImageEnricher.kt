@@ -14,14 +14,20 @@ class ItineraryImageEnricher(private val imageRepository: PlaceImageRepository) 
         val placeStops = itinerary.actividades.filter { it.type == StopType.PLACE }
         val targetStops = placeStops.take(6)
 
-        val deferredUrls = targetStops.map { stop ->
-            async {
-                val result = imageRepository.findImageForPlace(stop.titulo, itinerary.destino)
-                stop.order to result.getOrNull()
+        // Wikimedia recomienda mantener baja la concurrencia. Se procesan
+        // lotes de tres y cada lote termina antes de iniciar el siguiente.
+        val urlMap = targetStops.chunked(3).flatMap { batch ->
+            batch.map { stop ->
+                async {
+                    val result = imageRepository.findImageForPlace(
+                        stop.titulo,
+                        itinerary.destino,
+                    )
+                    stop.order to result.getOrNull()
+                }
             }
-        }
-
-        val urlMap = deferredUrls.awaitAll().toMap()
+                .awaitAll()
+        }.toMap()
 
         val enrichedStops = itinerary.actividades.map { stop ->
             if (urlMap.containsKey(stop.order)) {

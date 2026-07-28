@@ -14,9 +14,12 @@ import (
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/httpapi"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/osm"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/store"
+	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/ticketmaster"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/application"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/config"
+	"github.com/weaponsinmyhead/colotour/apps/api/internal/domain"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/platform"
+	"github.com/weaponsinmyhead/colotour/apps/api/internal/ports"
 )
 
 func main() {
@@ -46,10 +49,32 @@ func main() {
 	)
 	gamificationQueries := application.NewGamificationQueries(repository)
 	planner := application.NewItineraryPlanner(repository, catalogCommands, geocoder)
+	placeSources := map[domain.CatalogSource]ports.PlaceSource{
+		domain.CatalogSourceOpenStreetMap: overpass,
+	}
+	eventSources := make(map[domain.CatalogSource]ports.EventSource)
+	if cfg.TicketmasterAPIKey != "" {
+		eventSources[domain.CatalogSourceTicketmaster] = ticketmaster.NewClient(
+			cfg.TicketmasterURL,
+			cfg.TicketmasterAPIKey,
+			cfg.TicketmasterUserAgent,
+		)
+	}
+	catalogWorker := application.NewCatalogWorker(
+		catalogCommands,
+		geocoder,
+		placeSources,
+		eventSources,
+		clock,
+		ids,
+		cfg.CatalogWorkerQueueSize,
+		cfg.CatalogWorkerHistoryLimit,
+	)
 
 	handler := httpapi.NewRouter(httpapi.Dependencies{
 		CatalogCommands:      catalogCommands,
 		CatalogQueries:       catalogQueries,
+		CatalogJobs:          catalogWorker,
 		GamificationCommands: gamificationCommands,
 		GamificationQueries:  gamificationQueries,
 		ItineraryPlanner:     planner,
@@ -73,6 +98,16 @@ func main() {
 	)
 	defer stop()
 
+	go catalogWorker.Run(runContext)
+	go runCatalogSchedule(
+		runContext,
+		catalogWorker,
+		cfg.CatalogSyncTargets,
+		cfg.CatalogSyncRunOnStart,
+		cfg.CatalogSyncInterval,
+		logger,
+	)
+
 	go func() {
 		logger.Printf("listening on %s environment=%s", cfg.Address, cfg.Environment)
 		if serveErr := server.ListenAndServe(); !errors.Is(serveErr, http.ErrServerClosed) {
@@ -85,5 +120,65 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(shutdownContext); err != nil {
 		logger.Printf("graceful shutdown failed: %v", err)
+	}
+}
+
+type catalogJobEnqueuer interface {
+	Enqueue(
+		context.Context,
+		domain.CatalogSyncRequest,
+		domain.CatalogSyncTrigger,
+	) (domain.CatalogSyncJob, bool, error)
+}
+
+func runCatalogSchedule(
+	ctx context.Context,
+	worker catalogJobEnqueuer,
+	targets []domain.CatalogSyncRequest,
+	runOnStart bool,
+	interval time.Duration,
+	logger *log.Logger,
+) {
+	enqueueTargets := func() {
+		for _, target := range targets {
+			job, created, err := worker.Enqueue(
+				ctx,
+				target,
+				domain.CatalogSyncTriggerConfig,
+			)
+			if err != nil {
+				if !errors.Is(err, context.Canceled) {
+					logger.Printf(
+						"configured catalog sync rejected destination=%q error=%v",
+						target.Destination,
+						err,
+					)
+				}
+				continue
+			}
+			logger.Printf(
+				"configured catalog sync destination=%q job=%s created=%t",
+				target.Destination,
+				job.ID,
+				created,
+			)
+		}
+	}
+
+	if runOnStart {
+		enqueueTargets()
+	}
+	if interval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			enqueueTargets()
+		}
 	}
 }

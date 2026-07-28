@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	maxRequestBodyBytes  = 1 << 20
+	maxRequestBodyBytes = 1 << 20
 	openAPISpecFilename = "openapi/openapi.yaml"
 	docsHTML            = `<!DOCTYPE html>
 <html lang="en">
@@ -48,6 +48,7 @@ const (
 type Dependencies struct {
 	CatalogCommands      application.CatalogCommands
 	CatalogQueries       application.CatalogQueries
+	CatalogJobs          application.CatalogJobManager
 	GamificationCommands application.GamificationCommands
 	GamificationQueries  application.GamificationQueries
 	ItineraryPlanner     application.ItineraryPlanner
@@ -100,6 +101,12 @@ func NewRouter(dependencies Dependencies) http.Handler {
 	}))
 	mux.HandleFunc("/v1/catalog/import/osm", api.methodHandler(map[string]http.HandlerFunc{
 		http.MethodPost: api.admin(api.importOSM),
+	}))
+	mux.HandleFunc("/v1/workers/catalog/jobs", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodPost: api.admin(api.enqueueCatalogSync),
+	}))
+	mux.HandleFunc("/v1/workers/catalog/jobs/{jobID}", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodGet: api.admin(api.getCatalogSyncJob),
 	}))
 	mux.HandleFunc("/v1/itineraries/plan", api.methodHandler(map[string]http.HandlerFunc{
 		http.MethodPost: api.planItinerary,
@@ -259,6 +266,67 @@ func (api *API) importOSM(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(writer, http.StatusCreated, result)
+}
+
+func (api *API) enqueueCatalogSync(writer http.ResponseWriter, request *http.Request) {
+	if api.dependencies.CatalogJobs == nil {
+		writeError(
+			writer,
+			http.StatusServiceUnavailable,
+			errors.New("catalog worker is unavailable"),
+		)
+		return
+	}
+	var input domain.CatalogSyncRequest
+	if err := decodeJSON(writer, request, &input); err != nil {
+		writeError(writer, http.StatusBadRequest, err)
+		return
+	}
+	job, created, err := api.dependencies.CatalogJobs.Enqueue(
+		request.Context(),
+		input,
+		domain.CatalogSyncTriggerAPI,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, application.ErrCatalogWorkerQueueFull):
+			writeError(writer, http.StatusTooManyRequests, err)
+		case errors.Is(err, application.ErrCatalogSourceNotConfigured):
+			writeError(writer, http.StatusBadRequest, err)
+		default:
+			writeError(writer, http.StatusBadRequest, err)
+		}
+		return
+	}
+	writer.Header().Set("Location", "/v1/workers/catalog/jobs/"+job.ID)
+	if !created {
+		writer.Header().Set("X-Wayfii-Job-Reused", "true")
+	}
+	writeJSON(writer, http.StatusAccepted, job)
+}
+
+func (api *API) getCatalogSyncJob(writer http.ResponseWriter, request *http.Request) {
+	if api.dependencies.CatalogJobs == nil {
+		writeError(
+			writer,
+			http.StatusServiceUnavailable,
+			errors.New("catalog worker is unavailable"),
+		)
+		return
+	}
+	job, err := api.dependencies.CatalogJobs.GetJob(
+		request.Context(),
+		request.PathValue("jobID"),
+	)
+	if errors.Is(err, application.ErrCatalogJobNotFound) {
+		writeError(writer, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(writer, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, job)
 }
 
 func (api *API) planItinerary(writer http.ResponseWriter, request *http.Request) {

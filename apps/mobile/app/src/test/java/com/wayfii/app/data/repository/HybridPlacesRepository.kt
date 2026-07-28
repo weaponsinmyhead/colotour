@@ -2,6 +2,7 @@
 
 import com.wayfii.app.domain.engine.CandidatePlace
 
+// Composición histórica conservada solo para pruebas de regresión.
 class HybridPlacesRepository(
     private val overpassRepository: OverpassPlacesRepository,
     private val mockRepository: MockPlacesRepository

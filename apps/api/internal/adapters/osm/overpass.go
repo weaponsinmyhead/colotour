@@ -15,7 +15,11 @@ import (
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/ports"
 )
 
-const maxOverpassResponseBytes = 12 << 20
+const (
+	maxOverpassResponseBytes = 12 << 20
+	maxPlacesPerImport       = 500
+	maxOverpassAttempts      = 3
+)
 
 var _ ports.PlaceSource = (*OverpassClient)(nil)
 
@@ -54,16 +58,53 @@ func (client *OverpassClient) FindPlaces(
 	httpRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	httpRequest.Header.Set("User-Agent", client.userAgent)
 
-	response, err := client.client.Do(httpRequest)
-	if err != nil {
-		return nil, err
+	var response *http.Response
+	for attempt := 0; attempt < maxOverpassAttempts; attempt++ {
+		// NewRequest recibió un body reproducible, por lo que GetBody permite
+		// reconstruirlo de forma segura antes de cada reintento.
+		if attempt > 0 {
+			body, bodyErr := httpRequest.GetBody()
+			if bodyErr != nil {
+				return nil, bodyErr
+			}
+			httpRequest.Body = body
+		}
+		response, err = client.client.Do(httpRequest)
+		if err == nil && response.StatusCode >= 200 && response.StatusCode < 300 {
+			break
+		}
+		if err == nil {
+			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+			_ = response.Body.Close()
+			if !retryableOverpassStatus(response.StatusCode) {
+				return nil, fmt.Errorf("overpass returned status %d", response.StatusCode)
+			}
+		} else if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if attempt == maxOverpassAttempts-1 {
+			if err != nil {
+				return nil, fmt.Errorf(
+					"overpass request failed after %d attempts: %w",
+					maxOverpassAttempts,
+					err,
+				)
+			}
+			return nil, fmt.Errorf(
+				"overpass returned status %d after %d attempts",
+				response.StatusCode,
+				maxOverpassAttempts,
+			)
+		}
+		delay := overpassRetryDelay(attempt)
+		if err == nil {
+			delay = overpassRetryAfter(response.Header.Get("Retry-After"), delay)
+		}
+		if waitErr := waitForRetry(ctx, delay); waitErr != nil {
+			return nil, waitErr
+		}
 	}
 	defer response.Body.Close()
-
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-		return nil, fmt.Errorf("overpass returned status %d", response.StatusCode)
-	}
 
 	var payload overpassResponse
 	decoder := json.NewDecoder(io.LimitReader(response.Body, maxOverpassResponseBytes))
@@ -76,9 +117,49 @@ func (client *OverpassClient) FindPlaces(
 		place, valid := mapElement(element, request.Destination)
 		if valid {
 			places = append(places, place)
+			// A public Overpass instance is a shared service. Keep every worker run
+			// bounded even when a broad urban query returns thousands of objects.
+			if len(places) == maxPlacesPerImport {
+				break
+			}
 		}
 	}
 	return places, nil
+}
+
+func retryableOverpassStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+func overpassRetryDelay(attempt int) time.Duration {
+	return time.Duration(1<<attempt) * 500 * time.Millisecond
+}
+
+func overpassRetryAfter(raw string, fallback time.Duration) time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err == nil && seconds >= 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	return fallback
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func buildQuery(center domain.GeoPoint, radius int) string {
@@ -89,7 +170,7 @@ func buildQuery(center domain.GeoPoint, radius int) string {
   nwr["leisure"~"park|nature_reserve"](around:%d,%f,%f);
   nwr["natural"~"beach"](around:%d,%f,%f);
   nwr["amenity"~"restaurant|cafe|theatre|marketplace"](around:%d,%f,%f);
-  nwr["shop"](around:%d,%f,%f);
+  nwr["shop"~"mall|department_store|gift|craft|antiques|books|jewelry"](around:%d,%f,%f);
 );
 out center tags;`,
 		radius, center.Latitude, center.Longitude,

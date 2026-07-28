@@ -7,7 +7,7 @@ Repository Pattern.
 
 - generación local de itinerarios;
 - geocodificación mediante Nominatim;
-- POI reales mediante Overpass con fallback mock;
+- POI reales mediante Overpass, sin completar huecos con mocks;
 - mapa OpenStreetMap con OSMDroid;
 - enriquecimiento visual con Wikimedia y Coil;
 - propuestas visuales de aventura y selección de recorrido;
@@ -23,6 +23,10 @@ verificable deben evolucionar en `../api`, no duplicarse en Compose. El progreso
 se recompensa primero en el dispositivo y queda en una cola local si la API no
 está disponible. Cuando vuelve la conexión, se sincroniza con la misma clave de
 idempotencia para no duplicar puntos.
+
+El modo local usa Nominatim, Overpass y Wikimedia. Si no puede obtener
+coordenadas o lugares reales, devuelve un error visible en lugar de fabricar
+datos aproximados.
 
 Hasta incorporar autenticación, el viajero usa un identificador pseudónimo
 persistente por instalación. Completar una parada es irreversible para esa

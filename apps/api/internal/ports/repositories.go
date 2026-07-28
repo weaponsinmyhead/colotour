@@ -31,6 +31,10 @@ type PlaceSource interface {
 	FindPlaces(context.Context, domain.PlaceImportRequest) ([]domain.Place, error)
 }
 
+type EventSource interface {
+	FindEvents(context.Context, domain.EventImportRequest) ([]domain.Event, error)
+}
+
 type Geocoder interface {
 	Geocode(context.Context, string) (domain.GeoPoint, error)
 }

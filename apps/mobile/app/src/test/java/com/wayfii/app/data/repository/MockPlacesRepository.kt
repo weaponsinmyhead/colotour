@@ -5,6 +5,7 @@ import com.wayfii.app.data.model.BudgetLevel
 import com.wayfii.app.domain.engine.CandidatePlace
 import kotlin.math.abs
 
+// Datos deterministas exclusivos de pruebas; no se incluyen en el APK.
 class MockPlacesRepository : PlacesRepository {
     override suspend fun getCandidatePlaces(destino: String, baseLat: Double, baseLon: Double): List<CandidatePlace> {
         return listOf(
