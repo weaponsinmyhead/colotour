@@ -31,6 +31,10 @@ type PlaceSource interface {
 	FindPlaces(context.Context, domain.PlaceImportRequest) ([]domain.Place, error)
 }
 
+type Geocoder interface {
+	Geocode(context.Context, string) (domain.GeoPoint, error)
+}
+
 type Clock interface {
 	Now() time.Time
 }

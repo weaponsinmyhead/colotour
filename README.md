@@ -14,11 +14,10 @@ docs/
   product/       gamificación y sustentabilidad
 ```
 
-La app Android conserva temporalmente el motor local y sus integraciones
-Overpass/Nominatim como fallback. La API incorpora el nuevo catálogo persistido,
-la importación centralizada de OpenStreetMap, el planificador y el ledger de
-gamificación. La migración del móvil al contrato remoto debe realizarse después
-de estabilizar el endpoint `POST /v1/itineraries/plan`.
+La app Android usa `POST /v1/itineraries/plan` como fuente primaria en debug y
+conserva temporalmente el motor local con Overpass/Nominatim como fallback. La
+API centraliza geocodificación, importación de OpenStreetMap, catálogo
+persistido, planificación y ledger de gamificación.
 
 ## Desarrollo
 
@@ -49,6 +48,13 @@ docker compose up --build
 El servicio queda disponible en `http://localhost:8080`. En desarrollo guarda
 el estado en `apps/api/data/wayfii.json`; producción debe usar el adaptador
 PostgreSQL/PostGIS descrito en la arquitectura.
+
+El emulador Android usa `http://10.0.2.2:8080` por defecto. Para otro entorno:
+
+```bash
+cd apps/mobile
+bash ./gradlew assembleDebug -PWAYFII_API_BASE_URL=https://api.example.com
+```
 
 ## Documentación
 

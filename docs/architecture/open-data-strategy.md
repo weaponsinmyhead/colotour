@@ -18,9 +18,10 @@ Wayfii, sin abusar de infraestructura comunitaria gratuita.
 
 ## Principio operativo
 
-Overpass no debe consultarse por cada usuario. La API ejecuta una importación
-por zona, normaliza, persiste procedencia y sirve múltiples itinerarios desde
-el catálogo. Esto reduce latencia, fallos y consumo del servicio comunitario.
+Overpass no debe consultarse por cada usuario. Ante el primer itinerario de un
+destino sin cobertura, la API geocodifica la ciudad, importa la zona, normaliza
+y persiste procedencia. Los siguientes itinerarios reutilizan ese catálogo.
+Esto reduce latencia, fallos y consumo del servicio comunitario.
 
 La instancia pública de Nominatim declara capacidad limitada; por eso se debe
 cachear y evitar autocomplete sobre cada tecla. La política oficial de tiles
@@ -59,7 +60,7 @@ distribución deberán revisarse con asesoramiento legal antes de producción.
 - Elegir proveedor de tiles con SLA antes de superar el prototipo.
 - Definir región inicial para evaluar OSRM/Valhalla.
 - Crear política de frescura y moderación de eventos.
-- Incorporar un geocoder detrás de un puerto del backend.
+- Reemplazar el cache en memoria del geocoder por cache distribuido al escalar.
 
 ## Fuentes técnicas
 

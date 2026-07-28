@@ -3,7 +3,7 @@
 Aplicación Android nativa construida con Kotlin, Jetpack Compose, MVVM y
 Repository Pattern.
 
-## Estado heredado al separar el monorepo
+## Capacidades
 
 - generación local de itinerarios;
 - geocodificación mediante Nominatim;
@@ -14,10 +14,20 @@ Repository Pattern.
 - progreso de Main Quest, Side Quests y finalización local;
 - ViewModels para preferencias e itinerarios.
 
-El motor local continúa operativo como fallback mientras se estabiliza el
-contrato remoto. Las nuevas reglas compartidas, el catálogo, los eventos y la
-gamificación verificable deben evolucionar en `../api`, no duplicarse en
-Compose. El progreso visual actual todavía es estado local de la sesión.
+`RemoteItineraryRepository` consume la API como fuente primaria y
+`ResilientItineraryRepository` activa el motor local si la API no responde. Las
+nuevas reglas compartidas, el catálogo, los eventos y la gamificación
+verificable deben evolucionar en `../api`, no duplicarse en Compose. El progreso
+visual actual todavía es estado local de la sesión.
+
+En debug, el emulador apunta a `http://10.0.2.2:8080`. Puede sobrescribirse:
+
+```bash
+bash ./gradlew assembleDebug -PWAYFII_API_BASE_URL=https://api.example.com
+```
+
+Release no define una URL por defecto; sin la propiedad anterior usa el modo
+local. Solo el manifest de debug permite HTTP sin TLS.
 
 ## Comandos
 

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/geocoding"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/httpapi"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/osm"
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/adapters/store"
@@ -33,6 +34,7 @@ func main() {
 	clock := platform.RealClock{}
 	ids := platform.RandomIDGenerator{}
 	overpass := osm.NewOverpassClient(cfg.OverpassURL, cfg.OverpassUserAgent)
+	geocoder := geocoding.NewNominatimClient(cfg.NominatimURL, cfg.NominatimUserAgent)
 
 	catalogCommands := application.NewCatalogCommands(repository, overpass, clock, ids)
 	catalogQueries := application.NewCatalogQueries(repository)
@@ -43,7 +45,7 @@ func main() {
 		application.DefaultRewardPolicy(),
 	)
 	gamificationQueries := application.NewGamificationQueries(repository)
-	planner := application.NewItineraryPlanner(repository)
+	planner := application.NewItineraryPlanner(repository, catalogCommands, geocoder)
 
 	handler := httpapi.NewRouter(httpapi.Dependencies{
 		CatalogCommands:      catalogCommands,

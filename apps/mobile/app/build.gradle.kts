@@ -4,6 +4,13 @@
   alias(libs.plugins.kotlin.serialization)
 }
 
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val configuredApiBaseUrl = providers.gradleProperty("WAYFII_API_BASE_URL")
+    .orElse("")
+    .get()
+
 android {
     namespace = "com.wayfii.app"
     compileSdk = 36
@@ -16,8 +23,23 @@ android {
     }
 
     buildTypes {
+        debug {
+            val debugApiBaseUrl = configuredApiBaseUrl.ifBlank {
+                "http://10.0.2.2:8080"
+            }
+            buildConfigField(
+                "String",
+                "WAYFII_API_BASE_URL",
+                debugApiBaseUrl.asBuildConfigString(),
+            )
+        }
         release {
             isMinifyEnabled = false
+            buildConfigField(
+                "String",
+                "WAYFII_API_BASE_URL",
+                configuredApiBaseUrl.asBuildConfigString(),
+            )
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -28,7 +50,7 @@ android {
     buildFeatures {
       compose = true
       aidl = false
-      buildConfig = false
+      buildConfig = true
       shaders = false
     }
 

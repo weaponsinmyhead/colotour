@@ -25,6 +25,38 @@ func (fake itineraryCatalogFake) SearchEvents(
 	return nil, nil
 }
 
+type itineraryImporterFake struct {
+	catalog *itineraryCatalogFake
+	place   domain.Place
+	calls   int
+}
+
+func (fake *itineraryImporterFake) ImportPlaces(
+	_ context.Context,
+	_ domain.PlaceImportRequest,
+) (domain.PlaceImportResult, error) {
+	fake.calls++
+	fake.catalog.places = []domain.Place{fake.place}
+	return domain.PlaceImportResult{
+		Imported: 1,
+		Places:   []domain.Place{fake.place},
+		Source:   "test",
+	}, nil
+}
+
+type itineraryGeocoderFake struct {
+	point domain.GeoPoint
+	calls int
+}
+
+func (fake *itineraryGeocoderFake) Geocode(
+	_ context.Context,
+	_ string,
+) (domain.GeoPoint, error) {
+	fake.calls++
+	return fake.point, nil
+}
+
 func TestItineraryPlannerPrioritizesInterestsAndRespectsTime(t *testing.T) {
 	t.Parallel()
 
@@ -54,11 +86,11 @@ func TestItineraryPlannerPrioritizesInterestsAndRespectsTime(t *testing.T) {
 			QualityScore:               0.8,
 			Status:                     domain.StatusPublished,
 		},
-	}})
+	}}, nil, nil)
 
 	result, err := planner.Plan(context.Background(), domain.PlanItineraryRequest{
 		Destination:  "Buenos Aires",
-		Center:       center,
+		Center:       &center,
 		Interests:    []domain.Category{domain.CategoryCulture},
 		Mobility:     []string{"caminando"},
 		StartMinutes: 9 * 60,
@@ -79,5 +111,53 @@ func TestItineraryPlannerPrioritizesInterestsAndRespectsTime(t *testing.T) {
 		if stop.StartsAtMinutes+stop.DurationMinutes > result.EndMinutes {
 			t.Fatalf("stop exceeds end time: %#v", stop)
 		}
+	}
+}
+
+func TestItineraryPlannerGeocodesAndBootstrapsAnEmptyCatalog(t *testing.T) {
+	t.Parallel()
+
+	center := domain.GeoPoint{Latitude: -54.8019, Longitude: -68.3030}
+	place := domain.Place{
+		ID:                         "museum",
+		Name:                       "Museo del Fin del Mundo",
+		Summary:                    "Historia local",
+		Location:                   center,
+		City:                       "Ushuaia",
+		Categories:                 []domain.Category{domain.CategoryHistory},
+		PriceLevel:                 domain.PriceLow,
+		RecommendedDurationMinutes: 60,
+		QualityScore:               0.9,
+		Status:                     domain.StatusPublished,
+	}
+	catalog := &itineraryCatalogFake{}
+	importer := &itineraryImporterFake{catalog: catalog, place: place}
+	geocoder := &itineraryGeocoderFake{point: center}
+	planner := NewItineraryPlanner(catalog, importer, geocoder)
+
+	result, err := planner.Plan(context.Background(), domain.PlanItineraryRequest{
+		Destination:  "Ushuaia",
+		Interests:    []domain.Category{domain.CategoryHistory},
+		Mobility:     []string{"caminando"},
+		StartMinutes: 9 * 60,
+		EndMinutes:   13 * 60,
+		People:       1,
+		Budget:       domain.PriceLow,
+		Pace:         domain.PaceBalanced,
+	})
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+	if geocoder.calls != 1 {
+		t.Fatalf("geocoder calls = %d, want 1", geocoder.calls)
+	}
+	if importer.calls != 1 {
+		t.Fatalf("importer calls = %d, want 1", importer.calls)
+	}
+	if result.Center != center || result.Origin != center {
+		t.Fatalf("resolved points = %#v / %#v, want %#v", result.Center, result.Origin, center)
+	}
+	if len(result.Stops) != 1 || result.Stops[0].PlaceID != place.ID {
+		t.Fatalf("stops = %#v, want imported place", result.Stops)
 	}
 }

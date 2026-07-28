@@ -7,14 +7,16 @@ import (
 
 type PlanItineraryRequest struct {
 	Destination  string     `json:"destination"`
-	Center       GeoPoint   `json:"center"`
+	Center       *GeoPoint  `json:"center,omitempty"`
 	Origin       *GeoPoint  `json:"origin,omitempty"`
+	OriginName   string     `json:"originName,omitempty"`
 	Interests    []Category `json:"interests"`
 	Mobility     []string   `json:"mobility"`
 	StartMinutes int        `json:"startMinutes"`
 	EndMinutes   int        `json:"endMinutes"`
 	People       int        `json:"people"`
 	Budget       PriceLevel `json:"budget"`
+	Pace         TravelPace `json:"pace,omitempty"`
 	IncludeFood  bool       `json:"includeFood"`
 }
 
@@ -22,8 +24,10 @@ func (request PlanItineraryRequest) Validate() error {
 	if strings.TrimSpace(request.Destination) == "" {
 		return errors.New("destination is required")
 	}
-	if err := request.Center.Validate(); err != nil {
-		return err
+	if request.Center != nil {
+		if err := request.Center.Validate(); err != nil {
+			return err
+		}
 	}
 	if request.Origin != nil {
 		if err := request.Origin.Validate(); err != nil {
@@ -53,7 +57,27 @@ func (request PlanItineraryRequest) Validate() error {
 	if !request.Budget.Valid() {
 		return errors.New("unsupported budget")
 	}
+	if request.Pace != "" && !request.Pace.Valid() {
+		return errors.New("unsupported pace")
+	}
 	return nil
+}
+
+type TravelPace string
+
+const (
+	PaceRelaxed  TravelPace = "relaxed"
+	PaceBalanced TravelPace = "balanced"
+	PaceIntense  TravelPace = "intense"
+)
+
+func (pace TravelPace) Valid() bool {
+	switch pace {
+	case PaceRelaxed, PaceBalanced, PaceIntense:
+		return true
+	default:
+		return false
+	}
 }
 
 type ItineraryStop struct {
@@ -73,6 +97,8 @@ type ItineraryStop struct {
 
 type PlannedItinerary struct {
 	Destination       string          `json:"destination"`
+	Center            GeoPoint        `json:"center"`
+	Origin            GeoPoint        `json:"origin"`
 	Stops             []ItineraryStop `json:"stops"`
 	StartMinutes      int             `json:"startMinutes"`
 	EndMinutes        int             `json:"endMinutes"`

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -11,12 +12,26 @@ import (
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/ports"
 )
 
-type ItineraryPlanner struct {
-	catalog ports.CatalogQueryRepository
+type PlaceImporter interface {
+	ImportPlaces(context.Context, domain.PlaceImportRequest) (domain.PlaceImportResult, error)
 }
 
-func NewItineraryPlanner(catalog ports.CatalogQueryRepository) ItineraryPlanner {
-	return ItineraryPlanner{catalog: catalog}
+type ItineraryPlanner struct {
+	catalog  ports.CatalogQueryRepository
+	importer PlaceImporter
+	geocoder ports.Geocoder
+}
+
+func NewItineraryPlanner(
+	catalog ports.CatalogQueryRepository,
+	importer PlaceImporter,
+	geocoder ports.Geocoder,
+) ItineraryPlanner {
+	return ItineraryPlanner{
+		catalog:  catalog,
+		importer: importer,
+		geocoder: geocoder,
+	}
 }
 
 func (planner ItineraryPlanner) Plan(
@@ -27,15 +42,46 @@ func (planner ItineraryPlanner) Plan(
 		return domain.PlannedItinerary{}, err
 	}
 
-	places, err := planner.catalog.SearchPlaces(ctx, domain.PlaceFilter{
-		City:          request.Destination,
-		Center:        &request.Center,
-		RadiusMeters:  20_000,
-		Limit:         200,
-		PublishedOnly: true,
-	})
+	center, err := planner.resolvePoint(ctx, request.Center, request.Destination)
+	if err != nil {
+		return domain.PlannedItinerary{}, fmt.Errorf("resolve destination: %w", err)
+	}
+	origin := center
+	if request.Origin != nil {
+		origin = *request.Origin
+	} else if strings.TrimSpace(request.OriginName) != "" {
+		origin, err = planner.resolvePoint(
+			ctx,
+			nil,
+			request.OriginName+", "+request.Destination,
+		)
+		if err != nil {
+			// A starting point is optional. Falling back to the destination center
+			// keeps planning available when an address cannot be resolved.
+			origin = center
+		}
+	}
+
+	places, err := planner.searchPlaces(ctx, request.Destination, center)
 	if err != nil {
 		return domain.PlannedItinerary{}, err
+	}
+	if len(places) == 0 && planner.importer != nil {
+		_, importErr := planner.importer.ImportPlaces(ctx, domain.PlaceImportRequest{
+			Destination:  request.Destination,
+			Center:       center,
+			RadiusMeters: 5_000,
+		})
+		if importErr != nil {
+			return domain.PlannedItinerary{}, fmt.Errorf(
+				"bootstrap destination catalog: %w",
+				importErr,
+			)
+		}
+		places, err = planner.searchPlaces(ctx, request.Destination, center)
+		if err != nil {
+			return domain.PlannedItinerary{}, err
+		}
 	}
 	if len(places) == 0 {
 		return domain.PlannedItinerary{}, domain.ErrNotFound
@@ -53,7 +99,7 @@ func (planner ItineraryPlanner) Plan(
 		}
 		ranked = append(ranked, rankedPlace{
 			place: place,
-			score: placeScore(place, request.Center, interestSet, request.IncludeFood),
+			score: placeScore(place, center, interestSet, request.IncludeFood),
 		})
 	}
 	sort.SliceStable(ranked, func(i, j int) bool {
@@ -63,10 +109,6 @@ func (planner ItineraryPlanner) Plan(
 		ranked = ranked[:24]
 	}
 
-	origin := request.Center
-	if request.Origin != nil {
-		origin = *request.Origin
-	}
 	ordered := nearestNeighbor(origin, ranked)
 	stops := scheduleStops(request, origin, ordered)
 	if len(stops) == 0 {
@@ -75,12 +117,42 @@ func (planner ItineraryPlanner) Plan(
 
 	return domain.PlannedItinerary{
 		Destination:       request.Destination,
+		Center:            center,
+		Origin:            origin,
 		Stops:             stops,
 		StartMinutes:      request.StartMinutes,
 		EndMinutes:        request.EndMinutes,
 		EstimatedCost:     itineraryCost(stops),
 		DataSourceSummary: "Catálogo Wayfii persistido con fuentes abiertas y contenido curado",
 	}, nil
+}
+
+func (planner ItineraryPlanner) resolvePoint(
+	ctx context.Context,
+	explicit *domain.GeoPoint,
+	query string,
+) (domain.GeoPoint, error) {
+	if explicit != nil {
+		return *explicit, nil
+	}
+	if planner.geocoder == nil {
+		return domain.GeoPoint{}, errors.New("geocoder is not configured")
+	}
+	return planner.geocoder.Geocode(ctx, query)
+}
+
+func (planner ItineraryPlanner) searchPlaces(
+	ctx context.Context,
+	destination string,
+	center domain.GeoPoint,
+) ([]domain.Place, error) {
+	return planner.catalog.SearchPlaces(ctx, domain.PlaceFilter{
+		City:          destination,
+		Center:        &center,
+		RadiusMeters:  20_000,
+		Limit:         200,
+		PublishedOnly: true,
+	})
 }
 
 type rankedPlace struct {
@@ -151,6 +223,7 @@ func scheduleStops(
 		if duration <= 0 {
 			duration = 60
 		}
+		duration = adjustedDuration(duration, request.Pace)
 		startsAt := cursor + travelMinutes
 		if startsAt+duration > request.EndMinutes {
 			continue
@@ -166,10 +239,14 @@ func scheduleStops(
 			value.Amount *= float64(request.People)
 			estimatedCost = &value
 		}
+		stopType := "place"
+		if category == domain.CategoryGastronomy {
+			stopType = "food"
+		}
 		stops = append(stops, domain.ItineraryStop{
 			Order:           len(stops) + 1,
 			PlaceID:         place.ID,
-			Type:            "place",
+			Type:            stopType,
 			Title:           place.Name,
 			Summary:         place.Summary,
 			Location:        place.Location,
@@ -187,6 +264,17 @@ func scheduleStops(
 		}
 	}
 	return stops
+}
+
+func adjustedDuration(duration int, pace domain.TravelPace) int {
+	switch pace {
+	case domain.PaceRelaxed:
+		return int(math.Ceil(float64(duration) * 1.15))
+	case domain.PaceIntense:
+		return int(math.Ceil(float64(duration) * 0.85))
+	default:
+		return duration
+	}
 }
 
 func mobilityMetersPerMinute(mobility []string) float64 {

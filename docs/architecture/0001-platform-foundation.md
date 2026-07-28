@@ -83,6 +83,7 @@ flowchart TD
     Queries --> Ports
     Ports --> Store["JSON now / PostGIS next"]
     Ports --> OSM["OSM import adapter"]
+    Ports --> Geocoder["Nominatim geocoder"]
 ```
 
 ### 4. Contextos iniciales
@@ -105,14 +106,14 @@ categorías/tags y outbox transaccional para proyecciones futuras.
 
 ### 6. Transición del móvil
 
-El motor local se conserva temporalmente como fallback. La secuencia segura es:
+Android consume `POST /v1/itineraries/plan` mediante
+`RemoteItineraryRepository`. `ResilientItineraryRepository` conserva el motor
+local como fallback mientras se mide paridad, latencia y cobertura. La API
+geocodifica el destino e importa POIs al catálogo bajo demanda cuando todavía
+no existen datos publicados.
 
-1. estabilizar `POST /v1/itineraries/plan`;
-2. crear `RemoteItineraryRepository` en Android;
-3. usar API como fuente primaria y motor local como fallback;
-4. medir paridad, latencia y errores;
-5. retirar llamadas directas a Overpass/Nominatim del móvil cuando exista
-   cobertura operativa suficiente.
+Las llamadas directas a Overpass/Nominatim del móvil se retirarán cuando exista
+cobertura operativa, observabilidad y soporte offline suficientes.
 
 ## Consecuencias
 

@@ -12,6 +12,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.wayfii.app.data.repository.MockItineraryRepository
+import com.wayfii.app.data.repository.RemoteItineraryRepository
+import com.wayfii.app.data.repository.ResilientItineraryRepository
 import com.wayfii.app.ui.screens.ItineraryScreen
 import com.wayfii.app.ui.screens.PreferencesScreen
 import com.wayfii.app.ui.viewmodel.ItineraryViewModel
@@ -21,7 +23,16 @@ fun MainNavigation() {
   val navController = rememberNavController()
 
   val itineraryViewModel: ItineraryViewModel = viewModel {
-    ItineraryViewModel(MockItineraryRepository())
+    val localRepository = MockItineraryRepository()
+    val remoteRepository = BuildConfig.WAYFII_API_BASE_URL
+      .takeIf(String::isNotBlank)
+      ?.let(::RemoteItineraryRepository)
+    ItineraryViewModel(
+      ResilientItineraryRepository(
+        primary = remoteRepository,
+        localFallback = localRepository,
+      ),
+    )
   }
 
   NavHost(

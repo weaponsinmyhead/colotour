@@ -8,6 +8,8 @@ selectivo.
 - catálogo persistido de lugares y eventos;
 - búsqueda por ciudad, categoría, radio y fechas;
 - importación administrada desde OpenStreetMap/Overpass;
+- geocodificación centralizada y cacheada con Nominatim;
+- carga bajo demanda del catálogo para destinos todavía no importados;
 - planificación de itinerarios sobre datos almacenados;
 - registro idempotente de actividad y cálculo de puntos, niveles, rachas y
   badges;
@@ -43,10 +45,12 @@ reglas de negocio.
 | `ADMIN_API_KEY` | vacío | Protege comandos administrativos |
 | `OVERPASS_URL` | instancia pública principal | Endpoint de importación |
 | `OVERPASS_USER_AGENT` | valor de ejemplo | Identificación exigida al consumir OSM |
+| `NOMINATIM_URL` | instancia pública principal | Endpoint de geocodificación |
+| `NOMINATIM_USER_AGENT` | valor de ejemplo | Identificación del geocoder |
 
 `ADMIN_API_KEY` es obligatorio cuando `APP_ENV=production`. Antes de usar
-Overpass fuera de desarrollo debe configurarse un `User-Agent` con contacto
-real.
+Overpass o Nominatim fuera de desarrollo deben configurarse `User-Agent` con
+contacto real.
 
 ## Ejecución
 
@@ -74,16 +78,21 @@ curl -X POST http://localhost:8080/v1/itineraries/plan \
   -H 'Content-Type: application/json' \
   -d '{
     "destination": "Buenos Aires",
-    "center": {"latitude": -34.6037, "longitude": -58.3816},
+    "originName": "Plaza de Mayo",
     "interests": ["culture", "history"],
     "mobility": ["caminando"],
     "startMinutes": 540,
     "endMinutes": 1080,
     "people": 2,
     "budget": "low",
+    "pace": "balanced",
     "includeFood": true
   }'
 ```
+
+Si `center` no se envía, la API geocodifica el destino. Si el catálogo no tiene
+lugares publicados para esa ciudad, realiza una carga inicial acotada desde
+Overpass, persiste el resultado y vuelve a planificar.
 
 ## Límites conscientes del MVP
 
@@ -94,3 +103,5 @@ curl -X POST http://localhost:8080/v1/itineraries/plan \
 - La planificación usa distancia geodésica, no rutas por calle.
 - El adaptador PostgreSQL/PostGIS está definido por migración, pero aún no está
   conectado al runtime.
+- Las instancias públicas de Nominatim, Overpass y tiles no sustituyen un
+  proveedor con SLA para producción.
