@@ -1,0 +1,506 @@
+openapi: 3.1.0
+info:
+  title: Wayfii API
+  version: 0.1.0
+  description: Catálogo turístico, planificación y gamificación de Wayfii.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: /
+    description: Mismo origen que el cliente
+security: []
+tags:
+  - name: Health
+    description: Estado operativo del servicio.
+  - name: Catalog
+    description: Lugares, espectáculos e importación de datos.
+  - name: Itineraries
+    description: Planificación de recorridos.
+  - name: Gamification
+    description: Actividad y progreso del viajero.
+paths:
+  /health:
+    get:
+      summary: Consultar estado del servicio
+      tags: [Health]
+      operationId: health
+      responses:
+        "200":
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, time]
+                properties:
+                  status: {type: string, const: ok}
+                  service: {type: string, const: wayfii-api}
+                  time: {type: string, format: date-time}
+  /v1/catalog/places:
+    get:
+      summary: Buscar lugares publicados
+      tags: [Catalog]
+      operationId: searchPlaces
+      parameters:
+        - {$ref: "#/components/parameters/City"}
+        - {$ref: "#/components/parameters/Category"}
+        - {$ref: "#/components/parameters/Latitude"}
+        - {$ref: "#/components/parameters/Longitude"}
+        - {$ref: "#/components/parameters/Radius"}
+        - {$ref: "#/components/parameters/Limit"}
+      responses:
+        "200":
+          description: Lugares publicados
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, count]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Place"}
+                  count: {type: integer}
+        "400": {$ref: "#/components/responses/BadRequest"}
+    post:
+      summary: Crear o actualizar un lugar
+      tags: [Catalog]
+      operationId: upsertPlace
+      security: [{AdminBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Place"}
+      responses:
+        "201":
+          description: Lugar creado o actualizado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Place"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /v1/catalog/events:
+    get:
+      summary: Buscar eventos publicados
+      tags: [Catalog]
+      operationId: searchEvents
+      parameters:
+        - {$ref: "#/components/parameters/City"}
+        - {$ref: "#/components/parameters/Category"}
+        - {$ref: "#/components/parameters/Latitude"}
+        - {$ref: "#/components/parameters/Longitude"}
+        - {$ref: "#/components/parameters/Radius"}
+        - {$ref: "#/components/parameters/Limit"}
+        - name: from
+          in: query
+          schema: {type: string, format: date-time}
+        - name: to
+          in: query
+          schema: {type: string, format: date-time}
+      responses:
+        "200":
+          description: Eventos publicados
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, count]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Event"}
+                  count: {type: integer}
+        "400": {$ref: "#/components/responses/BadRequest"}
+    post:
+      summary: Crear o actualizar un evento
+      tags: [Catalog]
+      operationId: upsertEvent
+      security: [{AdminBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Event"}
+      responses:
+        "201":
+          description: Evento creado o actualizado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Event"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /v1/catalog/import/osm:
+    post:
+      summary: Importar lugares desde OpenStreetMap
+      tags: [Catalog]
+      operationId: importOpenStreetMapPlaces
+      security: [{AdminBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [destination, center, radiusMeters]
+              properties:
+                destination: {type: string}
+                center: {$ref: "#/components/schemas/GeoPoint"}
+                radiusMeters:
+                  type: integer
+                  minimum: 100
+                  maximum: 20000
+      responses:
+        "201":
+          description: Resultado de importación
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imported, places, source]
+                properties:
+                  imported: {type: integer}
+                  places:
+                    type: array
+                    items: {$ref: "#/components/schemas/Place"}
+                  source: {type: string}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "502":
+          description: Proveedor OSM no disponible
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/itineraries/plan:
+    post:
+      summary: Planificar un itinerario
+      tags: [Itineraries]
+      operationId: planItinerary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PlanItineraryRequest"}
+      responses:
+        "200":
+          description: Itinerario planificado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlannedItinerary"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404":
+          description: No hay lugares publicados para planificar
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/gamification/activities:
+    post:
+      summary: Registrar una actividad idempotente
+      tags: [Gamification]
+      operationId: recordActivity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Activity"}
+      responses:
+        "200":
+          description: La clave de idempotencia ya había sido procesada
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RecordActivityResult"}
+        "201":
+          description: Actividad registrada
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RecordActivityResult"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+  /v1/gamification/players/{userID}:
+    get:
+      summary: Consultar progreso del viajero
+      tags: [Gamification]
+      operationId: getPlayer
+      parameters:
+        - name: userID
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Perfil gamificado
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlayerProfile"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+components:
+  securitySchemes:
+    AdminBearer:
+      type: http
+      scheme: bearer
+  parameters:
+    City:
+      name: city
+      in: query
+      schema: {type: string}
+    Category:
+      name: category
+      in: query
+      schema: {$ref: "#/components/schemas/Category"}
+    Latitude:
+      name: lat
+      in: query
+      schema: {type: number, minimum: -90, maximum: 90}
+    Longitude:
+      name: lon
+      in: query
+      schema: {type: number, minimum: -180, maximum: 180}
+    Radius:
+      name: radiusMeters
+      in: query
+      schema: {type: number, minimum: 1, maximum: 100000, default: 5000}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+  responses:
+    BadRequest:
+      description: Solicitud inválida
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Unauthorized:
+      description: Credenciales administrativas inválidas
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: {type: string}
+    GeoPoint:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+    Category:
+      type: string
+      enum:
+        - classic
+        - alternative
+        - popular
+        - culture
+        - gastronomy
+        - nature
+        - family
+        - history
+        - shopping
+        - photography
+        - events
+        - adventure
+    PriceLevel:
+      type: string
+      enum: [free, low, medium, high]
+    PublicationStatus:
+      type: string
+      enum: [draft, published, archived]
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: {type: number, minimum: 0}
+        currency: {type: string, minLength: 3, maxLength: 3}
+    Source:
+      type: object
+      required: [provider]
+      properties:
+        provider: {type: string}
+        externalId: {type: string}
+        license: {type: string}
+        attribution: {type: string}
+        sourceUrl: {type: string, format: uri}
+    Place:
+      type: object
+      required:
+        - name
+        - summary
+        - location
+        - city
+        - categories
+        - priceLevel
+        - recommendedDurationMinutes
+        - qualityScore
+        - source
+      properties:
+        id: {type: string}
+        slug: {type: string}
+        name: {type: string}
+        summary: {type: string}
+        description: {type: string}
+        location: {$ref: "#/components/schemas/GeoPoint"}
+        address: {type: string}
+        city: {type: string}
+        countryCode: {type: string, minLength: 2, maxLength: 2}
+        categories:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/Category"}
+        tags:
+          type: object
+          additionalProperties: {type: string}
+        priceLevel: {$ref: "#/components/schemas/PriceLevel"}
+        estimatedCostPerPerson: {$ref: "#/components/schemas/Money"}
+        recommendedDurationMinutes: {type: integer, minimum: 0}
+        qualityScore: {type: number, minimum: 0, maximum: 1}
+        imageUrl: {type: string, format: uri}
+        status: {$ref: "#/components/schemas/PublicationStatus"}
+        source: {$ref: "#/components/schemas/Source"}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        version: {type: integer, minimum: 1}
+    Event:
+      type: object
+      required:
+        - name
+        - location
+        - city
+        - categories
+        - startsAt
+        - endsAt
+        - priceLevel
+        - source
+      properties:
+        id: {type: string}
+        placeId: {type: string}
+        name: {type: string}
+        description: {type: string}
+        location: {$ref: "#/components/schemas/GeoPoint"}
+        address: {type: string}
+        city: {type: string}
+        countryCode: {type: string, minLength: 2, maxLength: 2}
+        categories:
+          type: array
+          items: {$ref: "#/components/schemas/Category"}
+        startsAt: {type: string, format: date-time}
+        endsAt: {type: string, format: date-time}
+        priceLevel: {$ref: "#/components/schemas/PriceLevel"}
+        ticketUrl: {type: string, format: uri}
+        imageUrl: {type: string, format: uri}
+        status: {$ref: "#/components/schemas/PublicationStatus"}
+        source: {$ref: "#/components/schemas/Source"}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        version: {type: integer, minimum: 1}
+    PlanItineraryRequest:
+      type: object
+      required:
+        - destination
+        - center
+        - interests
+        - mobility
+        - startMinutes
+        - endMinutes
+        - people
+        - budget
+      properties:
+        destination: {type: string}
+        center: {$ref: "#/components/schemas/GeoPoint"}
+        origin: {$ref: "#/components/schemas/GeoPoint"}
+        interests:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/Category"}
+        mobility:
+          type: array
+          minItems: 1
+          items: {type: string}
+        startMinutes: {type: integer, minimum: 0, maximum: 1439}
+        endMinutes: {type: integer, minimum: 1, maximum: 1440}
+        people: {type: integer, minimum: 1, maximum: 20}
+        budget: {$ref: "#/components/schemas/PriceLevel"}
+        includeFood: {type: boolean, default: true}
+    ItineraryStop:
+      type: object
+      required:
+        - order
+        - placeId
+        - type
+        - title
+        - summary
+        - location
+        - startsAtMinutes
+        - durationMinutes
+        - category
+        - reason
+      properties:
+        order: {type: integer, minimum: 1}
+        placeId: {type: string}
+        type: {type: string, const: place}
+        title: {type: string}
+        summary: {type: string}
+        location: {$ref: "#/components/schemas/GeoPoint"}
+        startsAtMinutes: {type: integer}
+        durationMinutes: {type: integer}
+        estimatedCost: {$ref: "#/components/schemas/Money"}
+        category: {$ref: "#/components/schemas/Category"}
+        imageUrl: {type: string, format: uri}
+        reason: {type: string}
+    PlannedItinerary:
+      type: object
+      required:
+        - destination
+        - stops
+        - startMinutes
+        - endMinutes
+        - dataSourceSummary
+      properties:
+        destination: {type: string}
+        stops:
+          type: array
+          items: {$ref: "#/components/schemas/ItineraryStop"}
+        startMinutes: {type: integer}
+        endMinutes: {type: integer}
+        estimatedCost: {$ref: "#/components/schemas/Money"}
+        dataSourceSummary: {type: string}
+    Activity:
+      type: object
+      required: [idempotencyKey, userId, type, occurredAt]
+      properties:
+        idempotencyKey: {type: string}
+        userId: {type: string}
+        type:
+          type: string
+          enum:
+            - place_visited
+            - event_attended
+            - itinerary_completed
+            - place_contributed
+            - place_validated
+            - offer_redeemed
+        subjectId: {type: string}
+        metadata:
+          type: object
+          additionalProperties: {type: string}
+        occurredAt: {type: string, format: date-time}
+    PlayerProfile:
+      type: object
+      required: [userId, points, level, currentStreak, badges, updatedAt]
+      properties:
+        userId: {type: string}
+        points: {type: integer}
+        level: {type: integer}
+        currentStreak: {type: integer}
+        badges:
+          type: array
+          items: {type: string}
+        lastActivityAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    RecordActivityResult:
+      type: object
+      required: [recorded, profile]
+      properties:
+        recorded: {type: boolean}
+        profile: {$ref: "#/components/schemas/PlayerProfile"}

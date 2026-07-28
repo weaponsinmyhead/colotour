@@ -1,0 +1,17 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      APP_ENV: development
+      HTTP_ADDRESS: :8080
+      DATA_FILE: /data/wayfii.json
+      OVERPASS_USER_AGENT: WayfiiAPI/0.1 (configure-contact-before-production)
+    ports:
+      - "8080:8080"
+    volumes:
+      - wayfii_data:/data
+    restart: unless-stopped
+
+volumes:
+  wayfii_data:
