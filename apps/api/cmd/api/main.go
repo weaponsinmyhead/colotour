@@ -54,6 +54,7 @@ func main() {
 		GamificationQueries:  gamificationQueries,
 		ItineraryPlanner:     planner,
 		AdminAPIKey:          cfg.AdminAPIKey,
+		Environment:          cfg.Environment,
 		Logger:               logger,
 	})
 	server := &http.Server{

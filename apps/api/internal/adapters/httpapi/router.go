@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +17,33 @@ import (
 	"github.com/weaponsinmyhead/colotour/apps/api/internal/domain"
 )
 
-const maxRequestBodyBytes = 1 << 20
+const (
+	maxRequestBodyBytes  = 1 << 20
+	openAPISpecFilename = "openapi/openapi.yaml"
+	docsHTML            = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wayfii API Docs</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = function () {
+        SwaggerUIBundle({
+          url: '/openapi.yaml',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: 'BaseLayout',
+        });
+      };
+    </script>
+  </body>
+</html>`
+)
 
 type Dependencies struct {
 	CatalogCommands      application.CatalogCommands
@@ -24,11 +52,32 @@ type Dependencies struct {
 	GamificationQueries  application.GamificationQueries
 	ItineraryPlanner     application.ItineraryPlanner
 	AdminAPIKey          string
+	Environment          string
 	Logger               *log.Logger
 }
 
 type API struct {
 	dependencies Dependencies
+}
+
+func (api *API) methodHandler(handlers map[string]http.HandlerFunc) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		handler, ok := handlers[request.Method]
+		if !ok {
+			writer.Header().Set("Allow", strings.Join(getAllowedMethods(handlers), ", "))
+			http.Error(writer, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		handler(writer, request)
+	}
+}
+
+func getAllowedMethods(handlers map[string]http.HandlerFunc) []string {
+	methods := make([]string, 0, len(handlers))
+	for method := range handlers {
+		methods = append(methods, method)
+	}
+	return methods
 }
 
 func NewRouter(dependencies Dependencies) http.Handler {
@@ -38,17 +87,68 @@ func NewRouter(dependencies Dependencies) http.Handler {
 	api := &API{dependencies: dependencies}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health", api.health)
-	mux.HandleFunc("GET /v1/catalog/places", api.searchPlaces)
-	mux.HandleFunc("POST /v1/catalog/places", api.admin(api.upsertPlace))
-	mux.HandleFunc("GET /v1/catalog/events", api.searchEvents)
-	mux.HandleFunc("POST /v1/catalog/events", api.admin(api.upsertEvent))
-	mux.HandleFunc("POST /v1/catalog/import/osm", api.admin(api.importOSM))
-	mux.HandleFunc("POST /v1/itineraries/plan", api.planItinerary)
-	mux.HandleFunc("POST /v1/gamification/activities", api.recordActivity)
-	mux.HandleFunc("GET /v1/gamification/players/{userID}", api.getPlayer)
+	mux.HandleFunc("/health", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodGet: api.health,
+	}))
+	mux.HandleFunc("/v1/catalog/places", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodGet:  api.searchPlaces,
+		http.MethodPost: api.admin(api.upsertPlace),
+	}))
+	mux.HandleFunc("/v1/catalog/events", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodGet:  api.searchEvents,
+		http.MethodPost: api.admin(api.upsertEvent),
+	}))
+	mux.HandleFunc("/v1/catalog/import/osm", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodPost: api.admin(api.importOSM),
+	}))
+	mux.HandleFunc("/v1/itineraries/plan", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodPost: api.planItinerary,
+	}))
+	mux.HandleFunc("/v1/gamification/activities", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodPost: api.recordActivity,
+	}))
+	mux.HandleFunc("/v1/gamification/players/{userID}", api.methodHandler(map[string]http.HandlerFunc{
+		http.MethodGet: api.getPlayer,
+	}))
+
+	if api.dependencies.Environment != "production" {
+		mux.HandleFunc("/openapi.yaml", api.methodHandler(map[string]http.HandlerFunc{
+			http.MethodGet: api.serveOpenAPISpec,
+		}))
+		mux.HandleFunc("/docs", api.methodHandler(map[string]http.HandlerFunc{
+			http.MethodGet: api.serveDocs,
+		}))
+	}
 
 	return api.recoverPanic(api.securityHeaders(api.logRequest(mux)))
+}
+
+func (api *API) serveOpenAPISpec(writer http.ResponseWriter, request *http.Request) {
+	paths := []string{
+		openAPISpecFilename,
+		string(filepath.Separator) + openAPISpecFilename,
+	}
+	var data []byte
+	var err error
+	for _, p := range paths {
+		data, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, errors.New("openapi spec unavailable"))
+		return
+	}
+	writer.Header().Set("Content-Type", "application/vnd.oai.openapi+yaml; charset=utf-8")
+	writer.WriteHeader(http.StatusOK)
+	writer.Write(data)
+}
+
+func (api *API) serveDocs(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte(docsHTML))
 }
 
 func (api *API) health(writer http.ResponseWriter, _ *http.Request) {

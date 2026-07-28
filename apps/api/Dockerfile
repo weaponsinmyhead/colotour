@@ -11,6 +11,7 @@ FROM scratch
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/wayfii-api /wayfii-api
+COPY --from=build /src/openapi /openapi
 USER 65532:65532
 EXPOSE 8080
 VOLUME ["/data"]
