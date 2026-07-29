@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +42,8 @@ fun ItineraryScreen(
     uiState: ItineraryUiState,
     onBack: () -> Unit,
     onSelectProposal: (AdventureProposal) -> Unit = {},
+    onBackToProposals: () -> Unit = {},
+    onStartAdventure: (AdventureProposal) -> Unit = {},
     onToggleStop: (Int) -> Unit = {},
     onToggleSideQuest: (String) -> Unit = {},
     onFinishAdventure: () -> Unit = {},
@@ -85,6 +86,14 @@ fun ItineraryScreen(
                 )
             }
 
+            is ItineraryUiState.ProposalDetail -> {
+                AdventureDetailScreen(
+                    proposal = uiState.selectedProposal,
+                    onBack = onBackToProposals,
+                    onStartAdventure = { onStartAdventure(uiState.selectedProposal) }
+                )
+            }
+
             is ItineraryUiState.AdventureActive -> {
                 ActiveAdventureQuestView(
                     proposal = uiState.selectedProposal,
@@ -94,7 +103,7 @@ fun ItineraryScreen(
                     onToggleStop = onToggleStop,
                     onToggleSideQuest = onToggleSideQuest,
                     onFinishAdventure = onFinishAdventure,
-                    onBack = onBack
+                    onBack = onBackToProposals
                 )
             }
         }

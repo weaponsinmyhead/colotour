@@ -1,4 +1,4 @@
-﻿package com.wayfii.app.data.model
+package com.wayfii.app.data.model
 
 import kotlinx.serialization.Serializable
 
@@ -38,7 +38,12 @@ data class ItineraryStop(
     val latitud: Double? = null,
     val longitud: Double? = null,
     val reason: String = "",
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val distanceFromPrevious: String = "",
+    val historicalInfo: String = "",
+    val openingHours: String = "",
+    val funFact: String = "",
+    val audioGuideDuration: String = ""
 )
 
 @Serializable

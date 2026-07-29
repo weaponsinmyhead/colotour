@@ -49,6 +49,12 @@ fun MainNavigation() {
         onSelectProposal = { proposal ->
           itineraryViewModel.seleccionarAventura(proposal)
         },
+        onBackToProposals = {
+          itineraryViewModel.volverAPropuestas()
+        },
+        onStartAdventure = { proposal ->
+          itineraryViewModel.iniciarAventura(proposal)
+        },
         onToggleStop = { order ->
           itineraryViewModel.toggleCompletarParada(order)
         },

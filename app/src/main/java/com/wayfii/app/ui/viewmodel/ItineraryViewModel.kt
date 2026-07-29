@@ -19,6 +19,12 @@ sealed interface ItineraryUiState {
         val preferences: TravelPreferences
     ) : ItineraryUiState
 
+    data class ProposalDetail(
+        val selectedProposal: AdventureProposal,
+        val preferences: TravelPreferences,
+        val allProposals: List<AdventureProposal>
+    ) : ItineraryUiState
+
     data class AdventureActive(
         val selectedProposal: AdventureProposal,
         val completedStopOrders: Set<Int> = emptySet(),
@@ -42,6 +48,7 @@ class ItineraryViewModel(
             repository.generarItinerario(preferences)
                 .onSuccess { itinerary ->
                     val proposals = AdventureProposalGenerator.generateProposals(itinerary, preferences)
+                    // Show Adventure Proposals screen first (discovery mode)
                     _uiState.value = ItineraryUiState.ProposalsLoaded(proposals, preferences)
                 }
                 .onFailure { exception ->
@@ -50,8 +57,43 @@ class ItineraryViewModel(
         }
     }
 
+    fun verDetalleAventura(proposal: AdventureProposal) {
+        val currentState = _uiState.value
+        when (currentState) {
+            is ItineraryUiState.ProposalsLoaded -> {
+                _uiState.value = ItineraryUiState.ProposalDetail(
+                    selectedProposal = proposal,
+                    preferences = currentState.preferences,
+                    allProposals = currentState.proposals
+                )
+            }
+            is ItineraryUiState.ProposalDetail -> {
+                _uiState.value = currentState.copy(selectedProposal = proposal)
+            }
+            else -> {
+                seleccionarAventura(proposal)
+            }
+        }
+    }
+
     fun seleccionarAventura(proposal: AdventureProposal) {
+        verDetalleAventura(proposal)
+    }
+
+    fun iniciarAventura(proposal: AdventureProposal) {
         _uiState.value = ItineraryUiState.AdventureActive(selectedProposal = proposal)
+    }
+
+    fun volverAPropuestas() {
+        val currentState = _uiState.value
+        if (currentState is ItineraryUiState.ProposalDetail) {
+            _uiState.value = ItineraryUiState.ProposalsLoaded(
+                proposals = currentState.allProposals,
+                preferences = currentState.preferences
+            )
+        } else {
+            _uiState.value = ItineraryUiState.Idle
+        }
     }
 
     fun toggleCompletarParada(order: Int) {

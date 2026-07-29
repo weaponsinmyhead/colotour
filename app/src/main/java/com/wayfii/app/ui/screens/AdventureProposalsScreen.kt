@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.wayfii.app.data.model.AdventureProposal
 import com.wayfii.app.data.model.TravelPreferences
 
@@ -108,13 +110,13 @@ fun AdventureProposalsScreen(
 
             // Subtitle banner
             Text(
-                text = "Propuestas únicas de recomendación visual. Tocá una carta para ver detalles.",
+                text = "Tocá una propuesta para explorar detalles y elegir tu experiencia.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextMuted,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
             )
 
-            // Netflix/Spotify Recommendation List
+            // Discovery List of Adventures
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
@@ -129,7 +131,7 @@ fun AdventureProposalsScreen(
                         onCardClick = {
                             expandedProposalId = if (isExpanded) null else proposal.id
                         },
-                        onStartAdventure = {
+                        onViewDetail = {
                             onSelectProposal(proposal)
                         }
                     )
@@ -145,7 +147,7 @@ private fun SpotifyAdventureCard(
     proposal: AdventureProposal,
     isExpanded: Boolean,
     onCardClick: () -> Unit,
-    onStartAdventure: () -> Unit,
+    onViewDetail: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -167,10 +169,12 @@ private fun SpotifyAdventureCard(
                     .fillMaxWidth()
                     .height(230.dp)
             ) {
-                Image(
-                    painter = painterResource(id = proposal.imageResId),
+                AsyncImage(
+                    model = proposal.heroImageUrl ?: proposal.imageResId,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = proposal.imageResId),
+                    error = painterResource(id = proposal.imageResId),
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -223,7 +227,7 @@ private fun SpotifyAdventureCard(
                 }
             }
 
-            // ── EXPANDABLE SECTION (Reveals full description, highlights, side quests & CTA) ──
+            // ── EXPANDABLE SECTION (Reveals description, highlights, side quests preview & "Ver aventura") ──
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = fadeIn() + expandVertically(),
@@ -316,9 +320,9 @@ private fun SpotifyAdventureCard(
                         }
                     }
 
-                    // CTA Button
+                    // CTA Button: Ver aventura
                     Button(
-                        onClick = onStartAdventure,
+                        onClick = onViewDetail,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -329,11 +333,21 @@ private fun SpotifyAdventureCard(
                         ),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
-                        Text(
-                            text = "Comenzar aventura",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Ver aventura",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
