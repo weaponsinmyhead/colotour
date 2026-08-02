@@ -47,6 +47,8 @@ fun ItineraryScreen(
     onToggleStop: (Int) -> Unit = {},
     onToggleSideQuest: (String) -> Unit = {},
     onFinishAdventure: () -> Unit = {},
+    onSaveToJournal: (AdventureProposal) -> Unit = {},
+    onOpenJournal: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -103,6 +105,7 @@ fun ItineraryScreen(
                     onToggleStop = onToggleStop,
                     onToggleSideQuest = onToggleSideQuest,
                     onFinishAdventure = onFinishAdventure,
+                    onSaveToJournal = { onSaveToJournal(uiState.selectedProposal) },
                     onBack = onBackToProposals
                 )
             }
@@ -119,15 +122,33 @@ fun ActiveAdventureQuestView(
     onToggleStop: (Int) -> Unit,
     onToggleSideQuest: (String) -> Unit,
     onFinishAdventure: () -> Unit,
+    onSaveToJournal: () -> Unit = {},
     onBack: () -> Unit
 ) {
+    val chapters = remember(proposal) { proposal.chapters }
     var selectedStopOrder by remember { mutableStateOf<Int?>(proposal.mainQuestStops.firstOrNull()?.order) }
+    var activePostcard by remember { mutableStateOf<TravelPostcard?>(null) }
+    var activeSideQuestBanner by remember { mutableStateOf<SideQuestItem?>(proposal.sideQuests.firstOrNull()) }
+
     val carouselState = rememberLazyListState()
 
     val totalMainStops = proposal.mainQuestStops.size
     val completedCount = proposal.mainQuestStops.count { completedStopOrders.contains(it.order) }
-    val progressFraction = if (totalMainStops > 0) completedCount.toFloat() / totalMainStops else 0f
-    val progressPercent = (progressFraction * 100).toInt()
+
+    val activeChapter = remember(selectedStopOrder, completedStopOrders) {
+        val stop = proposal.mainQuestStops.find { it.order == selectedStopOrder } ?: proposal.mainQuestStops.firstOrNull()
+        stop?.let { s ->
+            AdventureChapter(
+                chapterNumber = s.order,
+                chapterTitle = "Capítulo ${s.order}: ${s.titulo.replace("Inicio: ", "")}",
+                narrative = s.descripcion,
+                discoveryText = s.funFact.ifBlank { s.historicalInfo.ifBlank { "Un lugar especial en la historia de la ciudad." } },
+                stopItem = s,
+                isUnlocked = true,
+                isCompleted = completedStopOrders.contains(s.order)
+            )
+        }
+    }
 
     LaunchedEffect(selectedStopOrder) {
         selectedStopOrder?.let { order ->
@@ -139,56 +160,75 @@ fun ActiveAdventureQuestView(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Map Layer
+        // 1. Progressive Map Layer (Completed = Solid Teal, Active Leg = Vibrant Coral, Future = Dashed)
         ItineraryMapView(
             stops = proposal.mainQuestStops,
             selectedStopOrder = selectedStopOrder,
             onMarkerClick = { order -> selectedStopOrder = order },
             completedStopOrders = completedStopOrders,
             sideQuests = proposal.sideQuests,
-            onSideQuestClick = { sq -> onToggleSideQuest(sq.id) },
+            onSideQuestClick = { sq ->
+                activeSideQuestBanner = sq
+                onToggleSideQuest(sq.id)
+            },
             modifier = Modifier.fillMaxSize()
         )
 
-        // 2. RPG Header Bar & Progress Indicator
-        FloatingQuestHeader(
+        // 2. Floating Quest HUD (Story & Objective Companion)
+        FloatingQuestHud(
             proposal = proposal,
+            activeChapter = activeChapter,
             completedCount = completedCount,
-            totalMainStops = totalMainStops,
-            progressPercent = progressPercent,
+            totalChapters = totalMainStops,
             onBack = onBack,
+            onPreviousChapter = {
+                selectedStopOrder?.let { order ->
+                    if (order > 1) selectedStopOrder = order - 1
+                }
+            },
+            onNextChapter = {
+                selectedStopOrder?.let { order ->
+                    if (order < totalMainStops) selectedStopOrder = order + 1
+                }
+            },
+            onCompleteChapter = { order ->
+                onToggleStop(order)
+                // Trigger Collectible Travel Postcard reveal on arrival/completion!
+                val completedStop = proposal.mainQuestStops.find { it.order == order }
+                completedStop?.let { s ->
+                    activePostcard = TravelPostcard(
+                        id = "postcard_$order",
+                        chapterTitle = "Capítulo $order Descubierto",
+                        locationName = s.titulo.replace("Inicio: ", ""),
+                        heroImageUrl = s.imageUrl ?: proposal.heroImageUrl ?: "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?q=80&w=1000&auto=format&fit=crop",
+                        shortStory = s.descripcion,
+                        funFact = s.funFact.ifBlank { s.historicalInfo.ifBlank { "Construcción conservada desde 1900 en la ciudad." } }
+                    )
+                }
+            },
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .padding(16.dp)
         )
 
-        // 3. Floating Side Quests Badge Count
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = 135.dp, start = 16.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = CardBg.copy(alpha = 0.95f),
-            border = BorderStroke(1.dp, BorderCol),
-            shadowElevation = 4.dp
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text("✨ Side Quests:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextDark)
-                Text(
-                    text = "${discoveredSideQuestIds.size}/${proposal.sideQuests.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = TealAccent
-                )
-            }
+        // 3. Floating Proximity Side Quest Notification Banner
+        activeSideQuestBanner?.let { sq ->
+            ProximitySideQuestBanner(
+                sideQuest = sq,
+                onExplore = { item ->
+                    onToggleSideQuest(item.id)
+                    activeSideQuestBanner = null
+                },
+                onDismiss = { activeSideQuestBanner = null },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 220.dp, start = 16.dp, end = 16.dp)
+            )
         }
 
-        // 4. Quest Stops Carousel
+        // 4. Quest Chapters Bottom Carousel
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -208,100 +248,46 @@ fun ActiveAdventureQuestView(
                         isSelected = stop.order == selectedStopOrder,
                         isCompleted = isCompleted,
                         onClick = { selectedStopOrder = stop.order },
-                        onToggleComplete = { onToggleStop(stop.order) },
+                        onToggleComplete = {
+                            onToggleStop(stop.order)
+                            activePostcard = TravelPostcard(
+                                id = "postcard_${stop.order}",
+                                chapterTitle = "Capítulo ${stop.order} Descubierto",
+                                locationName = stop.titulo.replace("Inicio: ", ""),
+                                heroImageUrl = stop.imageUrl ?: proposal.heroImageUrl ?: "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?q=80&w=1000&auto=format&fit=crop",
+                                shortStory = stop.descripcion,
+                                funFact = stop.funFact.ifBlank { stop.historicalInfo.ifBlank { "Un sitio emblemático con encanto histórico." } }
+                            )
+                        },
                         modifier = Modifier.width(310.dp)
                     )
                 }
             }
         }
 
-        // 5. Celebration Dialog Overlay
-        if (isFinished) {
+        // 5. DISCOVERY MOMENT: Collectible Travel Postcard Overlay Modal
+        activePostcard?.let { postcard ->
+            TravelPostcardOverlay(
+                postcard = postcard,
+                onContinue = {
+                    activePostcard = null
+                    // Advance to next chapter
+                    selectedStopOrder?.let { currentOrder ->
+                        if (currentOrder < totalMainStops) {
+                            selectedStopOrder = currentOrder + 1
+                        }
+                    }
+                }
+            )
+        }
+
+        // 6. Celebration Dialog Overlay (All Chapters Finished)
+        if (isFinished && activePostcard == null) {
             CelebrationOverlay(
                 proposal = proposal,
                 completedCount = completedCount,
                 discoveredSideQuestsCount = discoveredSideQuestIds.size,
-                onDismiss = onBack
-            )
-        }
-    }
-}
-
-@Composable
-private fun FloatingQuestHeader(
-    proposal: AdventureProposal,
-    completedCount: Int,
-    totalMainStops: Int,
-    progressPercent: Int,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = CardBg.copy(alpha = 0.96f),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(1.dp, BorderCol)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = TextDark
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${proposal.emoji} ${proposal.title}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = TextDark,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "Main Quest · $completedCount de $totalMainStops completados",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TealAccent,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = TealAccent.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = "$progressPercent%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TealAccent,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Progress Bar
-            LinearProgressIndicator(
-                progress = { (completedCount.toFloat() / totalMainStops).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(CircleShape),
-                color = TealAccent,
-                trackColor = Color(0xFFE2E8F0)
+                onDismiss = onSaveToJournal
             )
         }
     }
@@ -320,7 +306,7 @@ private fun QuestStopCard(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
-            .semantics { contentDescription = "Main Quest ${stop.order}: ${stop.titulo}" },
+            .semantics { contentDescription = "Capítulo ${stop.order}: ${stop.titulo}" },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted) Color(0xFFF0FDF4) else CardBg
@@ -356,13 +342,13 @@ private fun QuestStopCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stop.horaInicio,
+                        text = "Capítulo ${stop.order} · ${stop.horaInicio}",
                         style = MaterialTheme.typography.labelSmall,
                         color = TealAccent,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = stop.titulo,
+                        text = stop.titulo.replace("Inicio: ", ""),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = TextDark,
@@ -394,7 +380,7 @@ private fun QuestStopCard(
                 contentPadding = PaddingValues(0.dp)
             ) {
                 Text(
-                    text = if (isCompleted) "✓ Misión Completada" else "Marcar como completada",
+                    text = if (isCompleted) "✓ Capítulo Completado" else "Llegué a este capítulo ✦",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -436,7 +422,7 @@ private fun CelebrationOverlay(
                     color = TextDark
                 )
                 Text(
-                    text = "Completaste exitosamente ${proposal.title}",
+                    text = "Completaste todos los capítulos de ${proposal.title}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextMuted
                 )
@@ -448,7 +434,7 @@ private fun CelebrationOverlay(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     CelebrationStatItem(label = "Distancia", value = proposal.distanceText)
-                    CelebrationStatItem(label = "Main Quest", value = "$completedCount/${proposal.mainQuestStops.size}")
+                    CelebrationStatItem(label = "Capítulos", value = "$completedCount/${proposal.mainQuestStops.size}")
                     CelebrationStatItem(label = "Side Quests", value = "$discoveredSideQuestsCount")
                 }
 
@@ -462,7 +448,7 @@ private fun CelebrationOverlay(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = CoralAccent, contentColor = Color.White)
                 ) {
-                    Text("¡Excelente! Volver al inicio", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("¡Excelente! Guardar en mi Diario", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }

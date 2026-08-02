@@ -70,6 +70,7 @@ private val VIBE_ITEMS = listOf(
 @Composable
 fun PreferencesScreen(
     onGenerate: (TravelPreferences) -> Unit,
+    onOpenJournal: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -96,6 +97,14 @@ fun PreferencesScreen(
     var ritmo by remember { mutableStateOf(TravelPace.EQUILIBRADO) }
 
     var showAdvanced by remember { mutableStateOf(false) }
+
+    // ── Context Simulation State ─────────────────────────────────────────────
+    var useCustomContext by remember { mutableStateOf(false) }
+    var selectedSeason by remember { mutableStateOf(Season.WINTER) }
+    var selectedTimeOfDay by remember { mutableStateOf(TimeOfDay.AFTERNOON) }
+    var selectedWeather by remember { mutableStateOf(WeatherCondition.SUNNY) }
+    var selectedTemperature by remember { mutableFloatStateOf(18f) }
+    var showContextDetails by remember { mutableStateOf(false) }
 
     var showDestinoError by remember { mutableStateOf(false) }
     var showInteresError by remember { mutableStateOf(false) }
@@ -177,22 +186,17 @@ fun PreferencesScreen(
                 }
 
                 Surface(
-                    shape = CircleShape,
-                    color = CardBackground,
-                    border = BorderStroke(1.dp, BorderColor),
-                    shadowElevation = 2.dp,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clickable { /* Preferences header action */ }
-                        .semantics { contentDescription = "Perfil y configuración" }
+                    onClick = onOpenJournal,
+                    shape = RoundedCornerShape(16.dp),
+                    color = TealPrimary.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, TealPrimary.copy(alpha = 0.3f))
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Configuración",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(text = "📖 Diario", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TealPrimary)
                     }
                 }
             }
@@ -358,6 +362,22 @@ fun PreferencesScreen(
                     )
                 }
             }
+
+            // 2.5 Context Engine Card (Moment, Season & Weather)
+            ContextSelectionCard(
+                useCustomContext = useCustomContext,
+                selectedSeason = selectedSeason,
+                selectedTimeOfDay = selectedTimeOfDay,
+                selectedWeather = selectedWeather,
+                selectedTemperature = selectedTemperature,
+                showDetails = showContextDetails,
+                onToggleCustomContext = { useCustomContext = it },
+                onToggleDetails = { showContextDetails = !showContextDetails },
+                onSeasonSelect = { selectedSeason = it },
+                onTimeSelect = { selectedTimeOfDay = it },
+                onWeatherSelect = { selectedWeather = it },
+                onTempChange = { selectedTemperature = it }
+            )
 
             // 3. Compact Date/Time Selector ("Cuándo")
             Surface(
@@ -796,6 +816,16 @@ fun PreferencesScreen(
                         showMovilidadError = !hasMovilidad
 
                         if (hasDestino && hasIntereses && hasMovilidad) {
+                            val contextOverridePayload = if (useCustomContext) {
+                                ContextEnvironment(
+                                    season = selectedSeason,
+                                    timeOfDay = selectedTimeOfDay,
+                                    weather = selectedWeather,
+                                    temperatureCelsius = selectedTemperature.toInt(),
+                                    cityName = if (useCurrentLocation) (currentLocationName ?: "la ciudad") else destino
+                                )
+                            } else null
+
                             onGenerate(
                                 TravelPreferences(
                                     destino            = if (useCurrentLocation) (currentLocationName ?: "Mi ubicación") else destino,
@@ -809,7 +839,8 @@ fun PreferencesScreen(
                                     presupuesto        = presupuesto,
                                     ritmo              = ritmo,
                                     lat                = if (useCurrentLocation) currentCoords?.first else null,
-                                    lon                = if (useCurrentLocation) currentCoords?.second else null
+                                    lon                = if (useCurrentLocation) currentCoords?.second else null,
+                                    contextOverride    = contextOverridePayload
                                 )
                             )
                         }
@@ -991,3 +1022,275 @@ private fun obtenerUbicacionActual(
         // Location permission handled by launcher
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ContextSelectionCard(
+    useCustomContext: Boolean,
+    selectedSeason: Season,
+    selectedTimeOfDay: TimeOfDay,
+    selectedWeather: WeatherCondition,
+    selectedTemperature: Float,
+    showDetails: Boolean,
+    onToggleCustomContext: (Boolean) -> Unit,
+    onToggleDetails: () -> Unit,
+    onSeasonSelect: (Season) -> Unit,
+    onTimeSelect: (TimeOfDay) -> Unit,
+    onWeatherSelect: (WeatherCondition) -> Unit,
+    onTempChange: (Float) -> Unit
+) {
+    val currentBadgeText = if (useCustomContext) {
+        "${selectedSeason.emoji} ${selectedSeason.displayName} · ${selectedWeather.emoji} ${selectedWeather.displayName} (${selectedTemperature.toInt()}°C) · ${selectedTimeOfDay.emoji} ${selectedTimeOfDay.displayName}"
+    } else {
+        "🌸 Invierno (Detectado) · ☀️ Soleado (18°C) · 🍃 Tarde"
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = CardBackground,
+        border = BorderStroke(1.dp, if (useCustomContext) TealPrimary.copy(alpha = 0.6f) else BorderColor),
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(text = "✨", fontSize = 16.sp)
+                        Text(
+                            text = "Momento & Clima",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Text(
+                        text = "Adaptá la historia al clima y la estación del año",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+
+                Switch(
+                    checked = useCustomContext,
+                    onCheckedChange = {
+                        onToggleCustomContext(it)
+                        if (it && !showDetails) onToggleDetails()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = TealPrimary,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = Color(0xFFCBD5E1)
+                    )
+                )
+            }
+
+            // Current Active Badge Pill
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (useCustomContext) TealSelectedFill else Color(0xFFF1F5F9),
+                border = BorderStroke(0.5.dp, if (useCustomContext) TealPrimary else BorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clickable { onToggleDetails() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = currentBadgeText,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (useCustomContext) TealPrimary else TextPrimary
+                    )
+                    Icon(
+                        imageVector = if (showDetails) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = TealPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // Expandable Context Options
+            AnimatedVisibility(
+                visible = showDetails,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(
+                    modifier = Modifier.padding(top = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    HorizontalDivider(color = BorderColor)
+
+                    // Season Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Estación del Año",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Season.entries.forEach { season ->
+                                val isSelected = selectedSeason == season
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            onToggleCustomContext(true)
+                                            onSeasonSelect(season)
+                                        },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) TealSelectedFill else Color(0xFFF1F5F9),
+                                    border = BorderStroke(1.dp, if (isSelected) TealPrimary else BorderColor)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(text = season.emoji, fontSize = 16.sp)
+                                        Text(
+                                            text = season.displayName,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) TealPrimary else TextPrimary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Time of Day Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Momento del Día",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TimeOfDay.entries.forEach { tod ->
+                                val isSelected = selectedTimeOfDay == tod
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        onToggleCustomContext(true)
+                                        onTimeSelect(tod)
+                                    },
+                                    label = { Text("${tod.emoji} ${tod.displayName}") },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = TealSelectedFill,
+                                        selectedLabelColor = TealPrimary,
+                                        containerColor = Color(0xFFF1F5F9),
+                                        labelColor = TextPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        borderColor = BorderColor,
+                                        selectedBorderColor = TealPrimary,
+                                        enabled = true,
+                                        selected = isSelected
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Weather Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Condición Climática",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            WeatherCondition.entries.forEach { wc ->
+                                val isSelected = selectedWeather == wc
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        onToggleCustomContext(true)
+                                        onWeatherSelect(wc)
+                                    },
+                                    label = { Text("${wc.emoji} ${wc.displayName}") },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = TealSelectedFill,
+                                        selectedLabelColor = TealPrimary,
+                                        containerColor = Color(0xFFF1F5F9),
+                                        labelColor = TextPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        borderColor = BorderColor,
+                                        selectedBorderColor = TealPrimary,
+                                        enabled = true,
+                                        selected = isSelected
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Temperature Slider
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Temperatura Estimada",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "${selectedTemperature.toInt()} °C",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TealPrimary
+                            )
+                        }
+                        Slider(
+                            value = selectedTemperature,
+                            onValueChange = {
+                                onToggleCustomContext(true)
+                                onTempChange(it)
+                            },
+                            valueRange = 0f..40f,
+                            steps = 40,
+                            colors = SliderDefaults.colors(
+                                activeTrackColor = TealPrimary,
+                                inactiveTrackColor = Color(0xFFE2E8F0),
+                                thumbColor = TealPrimary
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

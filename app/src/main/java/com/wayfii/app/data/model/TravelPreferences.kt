@@ -1,4 +1,4 @@
-﻿package com.wayfii.app.data.model
+package com.wayfii.app.data.model
 
 import kotlinx.serialization.Serializable
 
@@ -15,5 +15,6 @@ data class TravelPreferences(
     val presupuesto: BudgetLevel,
     val ritmo: TravelPace,
     val lat: Double? = null,
-    val lon: Double? = null
+    val lon: Double? = null,
+    val contextOverride: ContextEnvironment? = null
 )

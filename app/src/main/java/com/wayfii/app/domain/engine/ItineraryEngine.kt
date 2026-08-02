@@ -1,9 +1,10 @@
-﻿package com.wayfii.app.domain.engine
+package com.wayfii.app.domain.engine
 
 import com.wayfii.app.data.model.*
 import com.wayfii.app.data.repository.GeocodingRepository
 import com.wayfii.app.data.repository.PlacesRepository
 import com.wayfii.app.data.repository.HybridPlacesRepository
+import com.wayfii.app.domain.engine.context.ContextEngine
 import java.util.Locale
 import kotlin.math.abs
 
@@ -15,8 +16,12 @@ class ItineraryEngine(
     private val routeOptimizer = RouteOptimizer()
     private val timePlanner = TimePlanner()
     private val costEstimator = CostEstimator()
+    private val contextEngine = ContextEngine()
 
     suspend fun generate(preferences: TravelPreferences): Itinerary {
+        // 0. Resolve Context Environment
+        val contextEnv = contextEngine.resolveContext(preferences)
+
         // 1. Intentar geocodificar destino principal o usar coordenadas provistas
         var isFallback = false
         var destLat = 0.0
@@ -59,14 +64,14 @@ class ItineraryEngine(
         // 3. Obtener candidatos locales alrededor del centro real geocodificado
         val candidates = placesRepository.getCandidatePlaces(preferences.destino, destLat, destLon)
 
-        // 4. Seleccionar los mejores candidatos incentivando la diversidad de intereses
+        // 4. Seleccionar los mejores candidatos incentivando la diversidad de intereses y contexto
         val selectedCandidates = mutableListOf<CandidatePlace>()
         val availableCandidates = candidates.toMutableList()
         val seenInterests = mutableSetOf<TourismInterest>()
 
         for (step in 1..10) {
             if (availableCandidates.isEmpty()) break
-            val best = availableCandidates.maxByOrNull { scorer.scorePlace(it, preferences, seenInterests) } ?: break
+            val best = availableCandidates.maxByOrNull { scorer.scorePlace(it, preferences, seenInterests, contextEnv) } ?: break
             selectedCandidates.add(best)
             availableCandidates.remove(best)
             seenInterests.add(best.estilo)
@@ -106,7 +111,7 @@ class ItineraryEngine(
                 visualType = ActivityVisualType.START,
                 horaInicio = String.format(Locale.getDefault(), "%02d:%02d", startHour, startMin),
                 titulo = "Inicio: $startPointName",
-                descripcion = "Comienzo del recorrido de exploración.",
+                descripcion = "Comienzo del recorrido de exploración en contexto ${contextEnv.season.displayName}.",
                 duracionEstimada = "0m",
                 costoEstimado = "Gratuito",
                 latitud = startPoint.latitude,
@@ -129,9 +134,9 @@ class ItineraryEngine(
                     }
 
                     val reason = if (preferences.intereses.contains(place.estilo)) {
-                        "Elegido por tu interés en ${place.estilo.descripcion}."
+                        "Elegido por tu interés en ${place.estilo.descripcion} y afinidad con ${contextEnv.season.displayName}."
                     } else {
-                        "Sugerido por alta afinidad y cercanía en la ruta."
+                        "Sugerido por alta afinidad contextual y cercanía en la ruta."
                     }
 
                     finalStops.add(

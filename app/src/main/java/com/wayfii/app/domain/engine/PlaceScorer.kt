@@ -1,16 +1,14 @@
-﻿package com.wayfii.app.domain.engine
+package com.wayfii.app.domain.engine
 
-import com.wayfii.app.data.model.BudgetLevel
-import com.wayfii.app.data.model.MobilityType
-import com.wayfii.app.data.model.TourismInterest
-import com.wayfii.app.data.model.TravelPreferences
+import com.wayfii.app.data.model.*
 import kotlin.math.abs
 
 class PlaceScorer {
     fun scorePlace(
         place: CandidatePlace,
         preferences: TravelPreferences,
-        seenInterests: Set<TourismInterest> = emptySet()
+        seenInterests: Set<TourismInterest> = emptySet(),
+        context: ContextEnvironment? = null
     ): Double {
         var score = 0.0
 
@@ -86,6 +84,77 @@ class PlaceScorer {
                     descLower.contains("bicicleta") || descLower.contains("ciclo")
             if (isBikeFriendly) {
                 score += 15.0
+            }
+        }
+
+        // 5. CONTEXTUAL INTELLIGENCE BOOSTS & PENALTIES
+        if (context != null) {
+            // A. Weather Adaptations
+            if (context.weather == WeatherCondition.RAIN) {
+                val isIndoor = place.estilo == TourismInterest.HISTORIA ||
+                        place.estilo == TourismInterest.CULTURAL ||
+                        place.estilo == TourismInterest.GASTRONOMICO ||
+                        nameLower.contains("museo") || nameLower.contains("café") || nameLower.contains("galería") ||
+                        nameLower.contains("pasaje") || nameLower.contains("librería") || nameLower.contains("teatro") ||
+                        descLower.contains("cubierto") || descLower.contains("techo") || descLower.contains("interior")
+                if (isIndoor) {
+                    score += 35.0
+                } else if (place.estilo == TourismInterest.NATURALEZA || nameLower.contains("parque") || nameLower.contains("jardín")) {
+                    score -= 30.0
+                }
+            }
+
+            if (context.weather == WeatherCondition.VERY_HOT || context.season == Season.SUMMER) {
+                val isCoolOrShaded = nameLower.contains("helad") || nameLower.contains("río") || nameLower.contains("costa") ||
+                        nameLower.contains("sombra") || descLower.contains("helado") || descLower.contains("agua")
+                if (isCoolOrShaded) {
+                    score += 25.0
+                }
+            }
+
+            // B. Time of Day Adaptations
+            if (context.timeOfDay == TimeOfDay.GOLDEN_HOUR) {
+                val isSunsetSpot = nameLower.contains("mirador") || nameLower.contains("río") || nameLower.contains("terraza") ||
+                        place.estilo == TourismInterest.FOTOGRAFIA || descLower.contains("puesta de sol") || descLower.contains("vista")
+                if (isSunsetSpot) {
+                    score += 30.0
+                }
+            }
+
+            if (context.timeOfDay == TimeOfDay.NIGHT) {
+                val isNightSpot = place.estilo == TourismInterest.GASTRONOMICO || place.estilo == TourismInterest.EVENTOS ||
+                        nameLower.contains("bar") || nameLower.contains("jazz") || nameLower.contains("speakeasy") ||
+                        descLower.contains("nocturn") || descLower.contains("música")
+                if (isNightSpot) {
+                    score += 35.0
+                } else if (nameLower.contains("jardín") || nameLower.contains("museo")) {
+                    score -= 20.0
+                }
+            }
+
+            // C. Seasonal Adaptations
+            if (context.season == Season.SPRING) {
+                val isSpringSpot = place.estilo == TourismInterest.NATURALEZA || nameLower.contains("botánico") ||
+                        nameLower.contains("jardín") || nameLower.contains("rosas") || nameLower.contains("parque")
+                if (isSpringSpot) {
+                    score += 30.0
+                }
+            }
+
+            if (context.season == Season.AUTUMN) {
+                val isAutumnSpot = nameLower.contains("hojas") || nameLower.contains("librería") || nameLower.contains("pasaje") ||
+                        place.estilo == TourismInterest.HISTORIA || place.estilo == TourismInterest.FOTOGRAFIA
+                if (isAutumnSpot) {
+                    score += 25.0
+                }
+            }
+
+            if (context.season == Season.WINTER) {
+                val isCozyWinterSpot = nameLower.contains("café") || nameLower.contains("historico") || nameLower.contains("teatro") ||
+                        nameLower.contains("biblioteca") || place.estilo == TourismInterest.CULTURAL
+                if (isCozyWinterSpot) {
+                    score += 30.0
+                }
             }
         }
 

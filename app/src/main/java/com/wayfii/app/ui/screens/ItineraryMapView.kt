@@ -68,8 +68,12 @@ fun ItineraryMapView(
         update = { map ->
             map.overlays.clear()
 
-            val mainPoints = mutableListOf<GeoPoint>()
+            val allPoints = mutableListOf<GeoPoint>()
             val completedPoints = mutableListOf<GeoPoint>()
+            val futurePoints = mutableListOf<GeoPoint>()
+            var activeLegStartPoint: GeoPoint? = null
+            var activeLegTargetPoint: GeoPoint? = null
+
             var targetMarker: Marker? = null
             var targetPoint: GeoPoint? = null
 
@@ -80,28 +84,45 @@ fun ItineraryMapView(
                 val lon = stop.longitud
                 if (lat != null && lon != null) {
                     val point = GeoPoint(lat, lon)
-                    mainPoints.add(point)
+                    allPoints.add(point)
 
                     val isCompleted = completedStopOrders.contains(stop.order)
+                    val isSelected = stop.order == selectedStopOrder
+
                     if (isCompleted) {
                         completedPoints.add(point)
+                    } else {
+                        futurePoints.add(point)
+                    }
+
+                    if (isSelected) {
+                        targetPoint = point
+                        val prevPoint = if (index > 0) {
+                            val prevStop = stops[index - 1]
+                            if (prevStop.latitud != null && prevStop.longitud != null) {
+                                GeoPoint(prevStop.latitud, prevStop.longitud)
+                            } else null
+                        } else null
+                        activeLegStartPoint = prevPoint ?: point
+                        activeLegTargetPoint = point
                     }
 
                     val isStart = index == 0 || stop.type == StopType.START
                     val isEnd = index == totalStops - 1
 
                     val iconLabel = when {
-                        isStart -> "🏠 Inicio"
-                        isEnd -> "🏁 Misión Cumplida"
-                        stop.type == StopType.FOOD -> "🍴 Comida"
-                        else -> "⭐ Misión Principal"
+                        isCompleted -> "✅ Capítulo Completado"
+                        isSelected -> "🎯 Capítulo Activo"
+                        isStart -> "🏠 Inicio de Aventura"
+                        isEnd -> "🏁 Capítulo Final"
+                        else -> "📖 Capítulo ${stop.order}"
                     }
 
                     val marker = Marker(map).apply {
                         position = point
                         title = "$iconLabel: ${stop.titulo}"
                         subDescription = "${stop.horaInicio} · ${stop.duracionEstimada}"
-                        snippet = if (isCompleted) "✅ ¡Completado!" else stop.reason
+                        snippet = if (isCompleted) "✅ ¡Capítulo completado!" else stop.descripcion
                         
                         setOnMarkerClickListener { _, _ ->
                             onMarkerClick(stop.order)
@@ -113,12 +134,11 @@ fun ItineraryMapView(
 
                     if (stop.order == selectedStopOrder) {
                         targetMarker = marker
-                        targetPoint = point
                     }
                 }
             }
 
-            // Side Quests Markers (Secondary, non-competing)
+            // Side Quests Markers (Proximity / Dynamic Markers)
             sideQuests.forEach { sideQuest ->
                 val lat = sideQuest.latitud
                 val lon = sideQuest.longitud
@@ -140,38 +160,54 @@ fun ItineraryMapView(
                 }
             }
 
-            // Draw Route Polylines: Solid line for completed parts, Dashed line for remaining parts
-            if (completedPoints.size > 1) {
-                val solidPolyline = Polyline(map).apply {
-                    setPoints(completedPoints)
-                    outlinePaint.color = 0xFF00897B.toInt() // Teal Active
-                    outlinePaint.strokeWidth = 10f
-                    outlinePaint.isAntiAlias = true
-                }
-                map.overlays.add(solidPolyline)
-            }
+            // ── PROGRESSIVE ROUTE POLYLINES ──
 
-            if (mainPoints.size > 1) {
-                val dashedPolyline = Polyline(map).apply {
-                    setPoints(mainPoints)
-                    outlinePaint.color = 0xFF80DEEA.toInt() // Soft Teal Dashed
+            // 1. FUTURE PATH: Subtle dashed line for unexplored path
+            if (allPoints.size > 1) {
+                val futurePolyline = Polyline(map).apply {
+                    setPoints(allPoints)
+                    outlinePaint.color = 0xFF94A3B8.toInt() // Subtle Slate Grey
                     outlinePaint.strokeWidth = 8f
                     outlinePaint.isAntiAlias = true
-                    outlinePaint.pathEffect = DashPathEffect(floatArrayOf(24f, 16f), 0f)
+                    outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 18f), 0f)
                 }
-                map.overlays.add(dashedPolyline)
+                map.overlays.add(futurePolyline)
             }
 
-            // Centering and animation
+            // 2. COMPLETED PATH: Solid rich Teal line for completed chapters
+            if (completedPoints.size > 1) {
+                val completedPolyline = Polyline(map).apply {
+                    setPoints(completedPoints)
+                    outlinePaint.color = 0xFF00897B.toInt() // Solid Teal
+                    outlinePaint.strokeWidth = 12f
+                    outlinePaint.isAntiAlias = true
+                }
+                map.overlays.add(completedPolyline)
+            }
+
+            // 3. CURRENT ACTIVE LEG: Vibrant glowing Coral highlight line
+            val startPt = activeLegStartPoint
+            val targetPt = activeLegTargetPoint
+            if (startPt != null && targetPt != null && startPt != targetPt) {
+                val activeLegPolyline = Polyline(map).apply {
+                    setPoints(listOf(startPt, targetPt))
+                    outlinePaint.color = 0xFFFF5A5F.toInt() // Vibrant Coral
+                    outlinePaint.strokeWidth = 14f
+                    outlinePaint.isAntiAlias = true
+                }
+                map.overlays.add(activeLegPolyline)
+            }
+
+            // Centering & Smooth Camera Animation
             if (targetPoint != null && targetMarker != null) {
                 map.controller.animateTo(targetPoint)
                 if (map.zoomLevelDouble < 15.0) {
                     map.controller.setZoom(16.0)
                 }
                 targetMarker?.showInfoWindow()
-            } else if (mainPoints.isNotEmpty()) {
-                val lats = mainPoints.map { it.latitude }
-                val lons = mainPoints.map { it.longitude }
+            } else if (allPoints.isNotEmpty()) {
+                val lats = allPoints.map { it.latitude }
+                val lons = allPoints.map { it.longitude }
                 val minLat = lats.minOrNull() ?: 0.0
                 val maxLat = lats.maxOrNull() ?: 0.0
                 val minLon = lons.minOrNull() ?: 0.0
@@ -182,7 +218,7 @@ fun ItineraryMapView(
                 val center = GeoPoint(centerLat, centerLon)
 
                 map.controller.setCenter(center)
-                val zoom = if (mainPoints.size <= 1) 15.0 else 13.5
+                val zoom = if (allPoints.size <= 1) 15.0 else 13.5
                 map.controller.setZoom(zoom)
             }
             

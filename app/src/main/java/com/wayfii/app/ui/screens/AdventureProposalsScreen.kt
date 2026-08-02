@@ -193,6 +193,26 @@ private fun SpotifyAdventureCard(
                         )
                 )
 
+                // Top Right Adventure Score Pill
+                proposal.adventureScore?.let { score ->
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(14.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black.copy(alpha = 0.7f),
+                        border = BorderStroke(0.5.dp, Color(0xFFFFD700))
+                    ) {
+                        Text(
+                            text = score.scoreLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFFD700),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+
                 // Content Overlay over Image
                 Column(
                     modifier = Modifier
@@ -205,6 +225,10 @@ private fun SpotifyAdventureCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val reasonText = proposal.contextualReason.ifBlank { proposal.adventureDna?.badgeText ?: "" }
+                        if (reasonText.isNotBlank()) {
+                            ImageBadgeText(text = reasonText)
+                        }
                         ImageBadge(icon = Icons.Default.DateRange, text = proposal.durationText)
                         ImageBadge(icon = Icons.Default.LocationOn, text = proposal.distanceText)
                         ImageBadge(icon = Icons.Default.Star, text = proposal.difficulty)
@@ -380,6 +404,26 @@ private fun ImageBadge(
                 text = text,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImageBadgeText(
+    text: String
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = TealAccent.copy(alpha = 0.85f),
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.4f))
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
                 color = Color.White
             )
         }

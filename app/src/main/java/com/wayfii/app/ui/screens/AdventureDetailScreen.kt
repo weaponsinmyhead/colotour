@@ -139,20 +139,41 @@ fun AdventureDetailScreen(
                             .padding(horizontal = 22.dp, vertical = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        // Category Label
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = TealAccentStart.copy(alpha = 0.12f),
-                            border = BorderStroke(0.5.dp, TealBorder)
+                        // Category & Context Badges
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = proposal.category.uppercase(),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TealAccentStart,
-                                letterSpacing = 1.4.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = TealAccentStart.copy(alpha = 0.12f),
+                                border = BorderStroke(0.5.dp, TealBorder)
+                            ) {
+                                Text(
+                                    text = proposal.category.uppercase(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TealAccentStart,
+                                    letterSpacing = 1.4.sp,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
+                            }
+
+                            proposal.adventureDna?.let { dna ->
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = Color(0xFFFFE0B2),
+                                    border = BorderStroke(0.5.dp, Color(0xFFFFB74D))
+                                ) {
+                                    Text(
+                                        text = dna.badgeText,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color(0xFFE65100),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
                         }
 
                         // Title
@@ -170,6 +191,9 @@ fun AdventureDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            proposal.adventureScore?.let { score ->
+                                QuickInfoChip(icon = "⚡", text = "${score.totalScore.toInt()} pts")
+                            }
                             QuickInfoChip(icon = "🕒", text = proposal.durationText)
                             QuickInfoChip(icon = "🚶", text = proposal.distanceText)
                             QuickInfoChip(icon = "🌿", text = proposal.difficulty)
