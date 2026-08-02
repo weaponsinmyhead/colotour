@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wayfii.app.data.model.*
+import com.wayfii.app.domain.engine.director.AdventureDirector
 import com.wayfii.app.ui.components.*
 import com.wayfii.app.ui.viewmodel.ItineraryUiState
 
@@ -125,7 +126,14 @@ fun ActiveAdventureQuestView(
     onSaveToJournal: () -> Unit = {},
     onBack: () -> Unit
 ) {
-    val chapters = remember(proposal) { proposal.chapters }
+    val director = remember { AdventureDirector() }
+
+    // Simulation states for live Adventure Director
+    var isSimulatingRain by remember { mutableStateOf(false) }
+    var isSimulatingSunset by remember { mutableStateOf(false) }
+    var isSimulatingSurprise by remember { mutableStateOf(false) }
+    var activeDirectorSurprise by remember { mutableStateOf<DirectorSurpriseMoment?>(null) }
+
     var selectedStopOrder by remember { mutableStateOf<Int?>(proposal.mainQuestStops.firstOrNull()?.order) }
     var activePostcard by remember { mutableStateOf<TravelPostcard?>(null) }
     var activeSideQuestBanner by remember { mutableStateOf<SideQuestItem?>(proposal.sideQuests.firstOrNull()) }
@@ -135,13 +143,30 @@ fun ActiveAdventureQuestView(
     val totalMainStops = proposal.mainQuestStops.size
     val completedCount = proposal.mainQuestStops.count { completedStopOrders.contains(it.order) }
 
-    val activeChapter = remember(selectedStopOrder, completedStopOrders) {
+    // Evaluate live adaptation from AdventureDirector
+    val adaptation = remember(selectedStopOrder, completedCount, isSimulatingRain, isSimulatingSunset, isSimulatingSurprise) {
+        val currentOrder = selectedStopOrder ?: 1
+        val result = director.evaluateLiveAdaptation(
+            proposal = proposal,
+            activeChapterOrder = currentOrder,
+            elapsedMinutes = completedCount * 20,
+            simulatedRain = isSimulatingRain,
+            simulatedSunset = isSimulatingSunset,
+            simulatedSurprise = isSimulatingSurprise
+        )
+        if (result.activeSurpriseMoment != null) {
+            activeDirectorSurprise = result.activeSurpriseMoment
+        }
+        result
+    }
+
+    val activeChapter = remember(selectedStopOrder, completedStopOrders, adaptation) {
         val stop = proposal.mainQuestStops.find { it.order == selectedStopOrder } ?: proposal.mainQuestStops.firstOrNull()
         stop?.let { s ->
             AdventureChapter(
                 chapterNumber = s.order,
                 chapterTitle = "Capítulo ${s.order}: ${s.titulo.replace("Inicio: ", "")}",
-                narrative = s.descripcion,
+                narrative = adaptation.liveNarrative,
                 discoveryText = s.funFact.ifBlank { s.historicalInfo.ifBlank { "Un lugar especial en la historia de la ciudad." } },
                 stopItem = s,
                 isUnlocked = true,
@@ -174,7 +199,35 @@ fun ActiveAdventureQuestView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // 2. Floating Quest HUD (Story & Objective Companion)
+        // 2. ADVENTURE DIRECTOR LIVE SIMULATION CONTROL BAR
+        DirectorControlBar(
+            isSimulatingRain = isSimulatingRain,
+            isSimulatingSunset = isSimulatingSunset,
+            isSimulatingSurprise = isSimulatingSurprise,
+            onToggleRain = {
+                isSimulatingRain = !isSimulatingRain
+                if (isSimulatingRain) isSimulatingSunset = false
+            },
+            onToggleSunset = {
+                isSimulatingSunset = !isSimulatingSunset
+                if (isSimulatingSunset) isSimulatingRain = false
+            },
+            onToggleSurprise = {
+                isSimulatingSurprise = !isSimulatingSurprise
+            },
+            onReset = {
+                isSimulatingRain = false
+                isSimulatingSunset = false
+                isSimulatingSurprise = false
+                activeDirectorSurprise = null
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+
+        // 3. Floating Quest HUD (Story & Objective Companion with Dynamic Adaptation Narrative)
         FloatingQuestHud(
             proposal = proposal,
             activeChapter = activeChapter,
@@ -193,7 +246,6 @@ fun ActiveAdventureQuestView(
             },
             onCompleteChapter = { order ->
                 onToggleStop(order)
-                // Trigger Collectible Travel Postcard reveal on arrival/completion!
                 val completedStop = proposal.mainQuestStops.find { it.order == order }
                 completedStop?.let { s ->
                     activePostcard = TravelPostcard(
@@ -209,26 +261,41 @@ fun ActiveAdventureQuestView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(16.dp)
+                .padding(top = 65.dp, start = 16.dp, end = 16.dp)
         )
 
-        // 3. Floating Proximity Side Quest Notification Banner
-        activeSideQuestBanner?.let { sq ->
-            ProximitySideQuestBanner(
-                sideQuest = sq,
-                onExplore = { item ->
-                    onToggleSideQuest(item.id)
-                    activeSideQuestBanner = null
-                },
-                onDismiss = { activeSideQuestBanner = null },
+        // 4. DIRECTOR SURPRISE MOMENT FLOATING BANNER
+        activeDirectorSurprise?.let { surprise ->
+            DirectorSurpriseBanner(
+                surpriseMoment = surprise,
+                onAction = { activeDirectorSurprise = null },
+                onDismiss = { activeDirectorSurprise = null },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 220.dp, start = 16.dp, end = 16.dp)
+                    .padding(top = 280.dp, start = 16.dp, end = 16.dp)
             )
         }
 
-        // 4. Quest Chapters Bottom Carousel
+        // 5. Floating Proximity Side Quest Notification Banner
+        if (activeDirectorSurprise == null) {
+            activeSideQuestBanner?.let { sq ->
+                ProximitySideQuestBanner(
+                    sideQuest = sq,
+                    onExplore = { item ->
+                        onToggleSideQuest(item.id)
+                        activeSideQuestBanner = null
+                    },
+                    onDismiss = { activeSideQuestBanner = null },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 280.dp, start = 16.dp, end = 16.dp)
+                )
+            }
+        }
+
+        // 6. Quest Chapters Bottom Carousel
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -265,13 +332,12 @@ fun ActiveAdventureQuestView(
             }
         }
 
-        // 5. DISCOVERY MOMENT: Collectible Travel Postcard Overlay Modal
+        // 7. DISCOVERY MOMENT: Collectible Travel Postcard Overlay Modal
         activePostcard?.let { postcard ->
             TravelPostcardOverlay(
                 postcard = postcard,
                 onContinue = {
                     activePostcard = null
-                    // Advance to next chapter
                     selectedStopOrder?.let { currentOrder ->
                         if (currentOrder < totalMainStops) {
                             selectedStopOrder = currentOrder + 1
@@ -281,7 +347,7 @@ fun ActiveAdventureQuestView(
             )
         }
 
-        // 6. Celebration Dialog Overlay (All Chapters Finished)
+        // 8. Celebration Dialog Overlay (All Chapters Finished)
         if (isFinished && activePostcard == null) {
             CelebrationOverlay(
                 proposal = proposal,
